@@ -46,6 +46,12 @@ logoImg.src = LOGO_FILE;
 // ══════════════════════════════════════════════════════════════
 const $  = id => document.getElementById(id);
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// Для подстановки в inline onclick='...': безопасная JS-строка в одинарных кавычках
+const jsq = s => String(s??'')
+  .replace(/\\/g,'\\\\')
+  .replace(/'/g,"\\'")
+  .replace(/\r/g,'\\r')
+  .replace(/\n/g,'\\n');
 const fmt = ts => { if(!ts)return'—'; const d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); };
 const gradeColor = g => { if(!g)return'gray'; if(g.startsWith('A'))return'green'; if(g.startsWith('B'))return'blue'; if(g.startsWith('C'))return'orange'; if(g==='D')return'red'; if(g==='F')return'darkred'; return'gray'; };
 const isAdmin = ()=> userProfile?.role==='admin';
@@ -141,8 +147,8 @@ async function loadAdminCourses() {
     card.innerHTML=`
       <div class="card-info"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
       <div class="card-actions">
-        <button class="btn btn-sm btn-secondary" onclick="goAdminTopics('${d.id}','${esc(c.title)}')">Темы</button>
-        ${canManageAccess()?`<button class="btn btn-sm btn-accent" onclick="openCourseAccess('${d.id}','${esc(c.title)}')">Доступ студентов</button>`:''}
+        <button class="btn btn-sm btn-secondary" onclick="goAdminTopics('${d.id}','${jsq(c.title)}')">Темы</button>
+        ${canManageAccess()?`<button class="btn btn-sm btn-accent" onclick="openCourseAccess('${d.id}','${jsq(c.title)}')">Доступ студентов</button>`:''}
         ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="deleteCourse('${d.id}')">Удалить</button>`:''}
       </div>`;
     list.appendChild(card);
@@ -219,7 +225,7 @@ async function loadAdminTopics() {
       <div class="card-info"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${blockCount}</p></div>
       <div class="card-actions">
         ${canEdit?`<button class="btn btn-sm btn-secondary" onclick="openTopicEditor('${t.id}')">✏ Редактировать</button>`:''}
-        ${canManageAccess()?`<button class="btn btn-sm btn-accent" onclick="openTopicAccess('${t.id}','${esc(t.title)}')">🔓 Доступ</button>`:''}
+        ${canManageAccess()?`<button class="btn btn-sm btn-accent" onclick="openTopicAccess('${t.id}','${jsq(t.title)}')">🔓 Доступ</button>`:''}
         ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="deleteTopic('${t.id}')">Удалить</button>`:''}
       </div>`;
     list.appendChild(card);

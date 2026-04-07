@@ -48,6 +48,9 @@ const $  = id => document.getElementById(id);
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmt = ts => { if(!ts)return'—'; const d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); };
 const gradeColor = g => { if(!g)return'gray'; if(g.startsWith('A'))return'green'; if(g.startsWith('B'))return'blue'; if(g.startsWith('C'))return'orange'; if(g==='D')return'red'; if(g==='F')return'darkred'; return'gray'; };
+const isAdmin = ()=> userProfile?.role==='admin';
+const isTeacher = ()=> userProfile?.role==='teacher';
+const canManageAccess = ()=> isAdmin() || isTeacher();
 
 function show(id) {
   document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
@@ -84,7 +87,7 @@ onAuthStateChanged(auth, async user => {
   userProfile = snap.data();
   applyNav();
   if      (userProfile.role==='admin')   { await loadAdminCourses(); show('screen-admin-courses'); }
-  else if (userProfile.role==='teacher') { await loadTeacherAnswers(); show('screen-teacher'); }
+  else if (userProfile.role==='teacher') { await loadAdminCourses(); show('screen-admin-courses'); }
   else                                   { await loadStudentCourses(); show('screen-student-courses'); }
 });
 
@@ -111,7 +114,7 @@ function applyNav() {
   $('nav-role-badge').textContent = userProfile.role==='admin'?'Администратор':userProfile.role==='teacher'?'Преподаватель':'Студент';
   const a=userProfile.role==='admin', t=userProfile.role==='teacher', s=userProfile.role==='student';
   ['nav-courses-a','nav-users-a','nav-answers-a','nav-grades-a'].forEach(id=>$(id).classList.toggle('hidden',!a));
-  ['nav-answers-t','nav-grades-t'].forEach(id=>$(id).classList.toggle('hidden',!t));
+  ['nav-courses-t','nav-answers-t','nav-grades-t'].forEach(id=>$(id).classList.toggle('hidden',!t));
   ['nav-courses-s','nav-grades-s'].forEach(id=>$(id).classList.toggle('hidden',!s));
 }
 
@@ -119,6 +122,7 @@ $('nav-courses-a').addEventListener('click',  ()=>{ loadAdminCourses();   show('
 $('nav-users-a').addEventListener('click',    ()=>{ loadAdminUsers();     show('screen-admin-users'); });
 $('nav-answers-a').addEventListener('click',  ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
 $('nav-grades-a').addEventListener('click',   ()=>{ loadGradesJournal();  show('screen-grades'); });
+$('nav-courses-t').addEventListener('click',  ()=>{ loadAdminCourses();   show('screen-admin-courses'); });
 $('nav-answers-t').addEventListener('click',  ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
 $('nav-grades-t').addEventListener('click',   ()=>{ loadGradesJournal();  show('screen-grades'); });
 $('nav-courses-s').addEventListener('click',  ()=>{ loadStudentCourses(); show('screen-student-courses'); });
@@ -133,15 +137,17 @@ async function loadAdminCourses() {
   if(snap.empty){list.innerHTML='<p class="empty-msg">Курсов нет. Создай первый!</p>';return;}
   snap.forEach(d=>{
     const c=d.data(); const card=document.createElement('div'); card.className='card';
+    const canEdit=isAdmin();
     card.innerHTML=`
       <div class="card-info"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
       <div class="card-actions">
         <button class="btn btn-sm btn-secondary" onclick="goAdminTopics('${d.id}','${esc(c.title)}')">Темы</button>
-        <button class="btn btn-sm btn-accent"    onclick="openCourseAccess('${d.id}','${esc(c.title)}')">Доступ студентов</button>
-        <button class="btn btn-sm btn-ghost"     onclick="deleteCourse('${d.id}')">Удалить</button>
+        ${canManageAccess()?`<button class="btn btn-sm btn-accent" onclick="openCourseAccess('${d.id}','${esc(c.title)}')">Доступ студентов</button>`:''}
+        ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="deleteCourse('${d.id}')">Удалить</button>`:''}
       </div>`;
     list.appendChild(card);
   });
+  $('btn-create-course')?.classList.toggle('hidden',!isAdmin());
 }
 
 $('btn-create-course').addEventListener('click',()=>$('modal-course').classList.remove('hidden'));
@@ -159,6 +165,7 @@ window.deleteCourse=async id=>{ if(!confirm('Удалить курс и все �
 //  ДОСТУП К КУРСУ — кто из студентов видит курс
 // ══════════════════════════════════════════════════════════════
 window.openCourseAccess=async(courseId,courseTitle)=>{
+  if(!canManageAccess()){ toast('Недостаточно прав','error'); return; }
   accessCourseId=courseId;
   $('lbl-course-access-title').textContent=courseTitle;
   const usersSnap=await getDocs(query(collection(db,'users'),where('role','==','student')));
@@ -171,16 +178,22 @@ window.openCourseAccess=async(courseId,courseTitle)=>{
     row.innerHTML=`<label class="access-label"><input type="checkbox" data-uid="${d.id}" ${enrolled.has(d.id)?'checked':''}/><span>${esc(u.name||u.email)}</span><small>${esc(u.email)}</small></label>`;
     list.appendChild(row);
   });
+  await renderCourseGroupsUI(courseId,'course');
   $('modal-course-access').classList.remove('hidden');
 };
 $('btn-course-access-cancel').addEventListener('click',()=>$('modal-course-access').classList.add('hidden'));
 $('btn-course-access-save').addEventListener('click',async()=>{
   const cbs=document.querySelectorAll('#course-access-list input[type=checkbox]');
-  await Promise.all([...cbs].map(cb=>{
-    const r=doc(db,'courses',accessCourseId,'enrollments',cb.dataset.uid);
-    return cb.checked ? setDoc(r,{at:serverTimestamp()}) : deleteDoc(r);
-  }));
-  toast('Доступ к курсу сохранён','success'); $('modal-course-access').classList.add('hidden');
+  try{
+    await Promise.all([...cbs].map(cb=>{
+      const r=doc(db,'courses',accessCourseId,'enrollments',cb.dataset.uid);
+      return cb.checked ? setDoc(r,{at:serverTimestamp(),by:currentUser.uid}) : deleteDoc(r);
+    }));
+    toast('Доступ к курсу сохранён','success'); $('modal-course-access').classList.add('hidden');
+  }catch(e){
+    console.error(e);
+    toast('Ошибка сохранения доступа: '+(e?.message||e),'error');
+  }
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -201,15 +214,17 @@ async function loadAdminTopics() {
   topics.forEach(t=>{
     const blockCount=(t.blocks||[]).length;
     const card=document.createElement('div'); card.className='card';
+    const canEdit=isAdmin();
     card.innerHTML=`
       <div class="card-info"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${blockCount}</p></div>
       <div class="card-actions">
-        <button class="btn btn-sm btn-secondary" onclick="openTopicEditor('${t.id}')">✏ Редактировать</button>
-        <button class="btn btn-sm btn-accent"    onclick="openTopicAccess('${t.id}','${esc(t.title)}')">🔓 Доступ</button>
-        <button class="btn btn-sm btn-ghost"     onclick="deleteTopic('${t.id}')">Удалить</button>
+        ${canEdit?`<button class="btn btn-sm btn-secondary" onclick="openTopicEditor('${t.id}')">✏ Редактировать</button>`:''}
+        ${canManageAccess()?`<button class="btn btn-sm btn-accent" onclick="openTopicAccess('${t.id}','${esc(t.title)}')">🔓 Доступ</button>`:''}
+        ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="deleteTopic('${t.id}')">Удалить</button>`:''}
       </div>`;
     list.appendChild(card);
   });
+  $('btn-new-topic')?.classList.toggle('hidden',!isAdmin());
 }
 
 $('btn-back-to-courses').addEventListener('click',()=>{ loadAdminCourses(); show('screen-admin-courses'); });
@@ -352,6 +367,7 @@ function renderEditor() {
 //  ДОСТУП К ТЕМЕ
 // ══════════════════════════════════════════════════════════════
 window.openTopicAccess=async(topicId,topicTitle)=>{
+  if(!canManageAccess()){ toast('Недостаточно прав','error'); return; }
   accessTopicId=topicId;
   $('lbl-access-topic-name').textContent=topicTitle;
 
@@ -377,18 +393,160 @@ window.openTopicAccess=async(topicId,topicTitle)=>{
     list.appendChild(row);
   });
   if(!shown)list.innerHTML='<p class="empty-msg">Нет студентов записанных на этот курс.</p>';
+  await renderCourseGroupsUI(selectedCourseId,'topic');
   $('modal-topic-access').classList.remove('hidden');
 };
 $('btn-topic-access-cancel').addEventListener('click',()=>$('modal-topic-access').classList.add('hidden'));
 $('btn-topic-access-save').addEventListener('click',async()=>{
   const cbs=document.querySelectorAll('#topic-access-list input[type=checkbox]');
   if(!cbs.length){$('modal-topic-access').classList.add('hidden');return;}
-  await Promise.all([...cbs].map(cb=>{
-    const r=doc(db,'courses',selectedCourseId,'topics',accessTopicId,'access',cb.dataset.uid);
-    return cb.checked ? setDoc(r,{at:serverTimestamp()}) : deleteDoc(r);
-  }));
-  toast('Доступ к теме сохранён','success'); $('modal-topic-access').classList.add('hidden');
+  try{
+    await Promise.all([...cbs].map(cb=>{
+      const r=doc(db,'courses',selectedCourseId,'topics',accessTopicId,'access',cb.dataset.uid);
+      return cb.checked ? setDoc(r,{at:serverTimestamp(),by:currentUser.uid}) : deleteDoc(r);
+    }));
+    toast('Доступ к теме сохранён','success'); $('modal-topic-access').classList.add('hidden');
+  }catch(e){
+    console.error(e);
+    toast('Ошибка сохранения доступа: '+(e?.message||e),'error');
+  }
 });
+
+// ══════════════════════════════════════════════════════════════
+//  ГРУППЫ СТУДЕНТОВ (внутри курса)
+//  courses/{courseId}/groups/{groupId} { name, memberIds[] }
+// ══════════════════════════════════════════════════════════════
+async function loadCourseGroups(courseId){
+  const snap=await getDocs(collection(db,'courses',courseId,'groups'));
+  const groups=[];
+  snap.forEach(d=>groups.push({id:d.id,...d.data()}));
+  groups.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
+  return groups;
+}
+
+function getCheckedStudentIds(listSelector){
+  const cbs=document.querySelectorAll(listSelector+' input[type=checkbox]');
+  return [...cbs].filter(cb=>cb.checked).map(cb=>cb.dataset.uid);
+}
+
+function setCheckedStudentIds(listSelector, idsSet){
+  const cbs=document.querySelectorAll(listSelector+' input[type=checkbox]');
+  [...cbs].forEach(cb=>{ cb.checked = idsSet.has(cb.dataset.uid); });
+}
+
+async function createOrUpdateGroup(courseId, groupId, name, memberIds){
+  const ref = groupId
+    ? doc(db,'courses',courseId,'groups',groupId)
+    : doc(collection(db,'courses',courseId,'groups'));
+  await setDoc(ref,{
+    name: name.trim(),
+    memberIds: Array.from(new Set(memberIds)),
+    updatedAt: serverTimestamp(),
+    updatedBy: currentUser.uid
+  },{merge:true});
+  return ref.id;
+}
+
+async function deleteGroup(courseId, groupId){
+  await deleteDoc(doc(db,'courses',courseId,'groups',groupId));
+}
+
+async function renderCourseGroupsUI(courseId, mode){
+  // mode: 'course' | 'topic'
+  const containerId = mode==='course' ? 'course-access-groups' : 'topic-access-groups';
+  const listSelector = mode==='course' ? '#course-access-list' : '#topic-access-list';
+  const container = $(containerId);
+  if(!container) return;
+
+  const groups = await loadCourseGroups(courseId);
+  container.innerHTML = `
+    <div class="groups-box">
+      <div class="groups-head">
+        <strong>Группы</strong>
+        <span class="muted">— для массового выбора студентов</span>
+      </div>
+      <div class="groups-actions">
+        <input id="${containerId}-name" type="text" placeholder="Название группы (например, 10А)" />
+        <button class="btn btn-sm btn-secondary" id="${containerId}-create">Создать из отмеченных</button>
+      </div>
+      <div id="${containerId}-list" class="groups-list"></div>
+    </div>
+  `;
+
+  const listEl = document.getElementById(containerId+'-list');
+  if(!groups.length){
+    listEl.innerHTML = `<p class="muted" style="padding:.5rem 0">Групп пока нет</p>`;
+  } else {
+    listEl.innerHTML = groups.map(g=>`
+      <div class="group-row">
+        <div class="group-info">
+          <div class="group-name">${esc(g.name||'Без названия')}</div>
+          <div class="muted">Студентов: ${(g.memberIds||[]).length}</div>
+        </div>
+        <div class="group-btns">
+          <button class="btn btn-sm btn-secondary" data-act="apply" data-gid="${g.id}">Применить</button>
+          <button class="btn btn-sm btn-secondary" data-act="add" data-gid="${g.id}">Добавить отмеченных</button>
+          <button class="btn btn-sm btn-ghost" data-act="del" data-gid="${g.id}">Удалить</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const nameInp = document.getElementById(containerId+'-name');
+  const createBtn = document.getElementById(containerId+'-create');
+  createBtn.addEventListener('click', async ()=>{
+    const name = nameInp.value.trim();
+    if(!name){ toast('Введи название группы','error'); return; }
+    const ids = getCheckedStudentIds(listSelector);
+    if(!ids.length){ toast('Отметь студентов для группы','error'); return; }
+    try{
+      await createOrUpdateGroup(courseId, null, name, ids);
+      nameInp.value='';
+      toast('Группа создана','success');
+      await renderCourseGroupsUI(courseId, mode);
+    }catch(e){
+      console.error(e);
+      toast('Ошибка создания группы: '+(e?.message||e),'error');
+    }
+  });
+
+  listEl.addEventListener('click', async (ev)=>{
+    const btn = ev.target?.closest('button');
+    if(!btn) return;
+    const gid = btn.dataset.gid;
+    const act = btn.dataset.act;
+    const group = groups.find(g=>g.id===gid);
+    if(!group) return;
+
+    if(act==='apply'){
+      const set = new Set((group.memberIds||[]).map(String));
+      setCheckedStudentIds(listSelector, set);
+      toast('Группа применена','success');
+    } else if(act==='add'){
+      const addIds = getCheckedStudentIds(listSelector);
+      if(!addIds.length){ toast('Отметь студентов, которых добавить','error'); return; }
+      const merged = new Set([...(group.memberIds||[]).map(String), ...addIds.map(String)]);
+      try{
+        await createOrUpdateGroup(courseId, gid, group.name||'Группа', Array.from(merged));
+        toast('Группа обновлена','success');
+        await renderCourseGroupsUI(courseId, mode);
+      }catch(e){
+        console.error(e);
+        toast('Ошибка обновления группы: '+(e?.message||e),'error');
+      }
+    } else if(act==='del'){
+      if(!confirm('Удалить группу?')) return;
+      try{
+        await deleteGroup(courseId, gid);
+        toast('Группа удалена','success');
+        await renderCourseGroupsUI(courseId, mode);
+      }catch(e){
+        console.error(e);
+        toast('Ошибка удаления группы: '+(e?.message||e),'error');
+      }
+    }
+  });
+}
 
 // ══════════════════════════════════════════════════════════════
 //  ПОЛЬЗОВАТЕЛИ
@@ -810,6 +968,17 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .access-label input{width:auto;flex-shrink:0;} .access-label span{font-weight:600;font-size:.88rem;}
 .access-label small{color:var(--mu);font-size:.77rem;margin-left:auto;}
 
+/* GROUPS */
+.groups-box{background:var(--bg);border:1px solid var(--br);border-radius:var(--rd);padding:.85rem;}
+.groups-head{display:flex;align-items:baseline;gap:.55rem;margin-bottom:.7rem;}
+.groups-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem;}
+.groups-actions input{flex:1;min-width:180px;}
+.groups-list{display:flex;flex-direction:column;gap:.45rem;}
+.group-row{background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);padding:.65rem .75rem;display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;}
+.group-info{flex:1;min-width:180px;}
+.group-name{font-weight:700;font-size:.88rem;}
+.group-btns{display:flex;gap:.35rem;flex-wrap:wrap;}
+
 /* SEARCH */
 .search-wrap{margin-bottom:.95rem;}
 
@@ -839,6 +1008,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   <button id="nav-answers-a" class="hidden">Ответы</button>
   <button id="nav-grades-a"  class="hidden">Журнал оценок</button>
   <!-- Преподаватель -->
+  <button id="nav-courses-t" class="hidden">Курсы</button>
   <button id="nav-answers-t" class="hidden">Ответы студентов</button>
   <button id="nav-grades-t"  class="hidden">Журнал оценок</button>
   <!-- Студент -->
@@ -974,6 +1144,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
     <p class="muted" style="margin-bottom:.8rem">Курс: <strong id="lbl-course-access-title"></strong></p>
     <p style="font-size:.8rem;color:var(--mu);margin-bottom:.7rem">Отмеченные студенты видят этот курс:</p>
     <div id="course-access-list"></div>
+    <div id="course-access-groups" style="margin-top:1rem"></div>
     <div class="modal-actions" style="margin-top:1rem">
       <button class="btn btn-ghost" id="btn-course-access-cancel">Отмена</button>
       <button class="btn btn-primary" id="btn-course-access-save">Сохранить</button>
@@ -988,6 +1159,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
     <p class="muted" style="margin-bottom:.8rem">Тема: <strong id="lbl-access-topic-name"></strong></p>
     <p style="font-size:.8rem;color:var(--mu);margin-bottom:.7rem">Отмеченные студенты могут открыть эту тему:</p>
     <div id="topic-access-list"></div>
+    <div id="topic-access-groups" style="margin-top:1rem"></div>
     <div class="modal-actions" style="margin-top:1rem">
       <button class="btn btn-ghost" id="btn-topic-access-cancel">Отмена</button>
       <button class="btn btn-primary" id="btn-topic-access-save">Сохранить</button>

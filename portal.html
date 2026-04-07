@@ -13,12 +13,10 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
 import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc,
   updateDoc, deleteDoc, query, where, orderBy, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL }
-  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-// ╔══════════════════════════════════════════════════════════════╗
-// ║  ВСТАВЬ СВОИ КЛЮЧИ FIREBASE СЮДА                           ║
-// ╚══════════════════════════════════════════════════════════════╝
+// ══════════════════════════════════════════════════════════════
+//  КЛЮЧИ FIREBASE
+// ══════════════════════════════════════════════════════════════
 const firebaseConfig = {
   apiKey:            "AIzaSyBKlsuYCWuCKzTuzHliIRONZIKWz_Q2f6w",
   authDomain:        "studycaseportal-1b584.firebaseapp.com",
@@ -28,64 +26,62 @@ const firebaseConfig = {
   appId:             "1:704493714973:web:7247ed7fbf195ee87710f4"
 };
 
-const app     = initializeApp(firebaseConfig);
-const auth    = getAuth(app);
-const db      = getFirestore(app);
-const storage = getStorage(app);
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  ЛОГОТИП
+//  Положи файл logo.png рядом с portal.html в GitHub репозитории
+//  Если файла нет — показывается текстовое название
+// ══════════════════════════════════════════════════════════════
+const LOGO_FILE = 'logo.png'; // ← имя файла логотипа в репозитории
+const logoImg   = new Image();
+logoImg.onload  = () => { document.querySelectorAll('.logo-img').forEach(el=>{ el.src=LOGO_FILE; el.style.display='block'; }); document.querySelectorAll('.logo-text').forEach(el=>el.style.display='none'); };
+logoImg.onerror = () => {}; // нет файла — остаётся текст
+logoImg.src = LOGO_FILE;
+
+// ══════════════════════════════════════════════════════════════
 //  УТИЛИТЫ
-// ════════════════════════════════════════════════════════════════
-const $ = id => document.getElementById(id);
-function show(id) { document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); $(id)?.classList.remove('hidden'); }
+// ══════════════════════════════════════════════════════════════
+const $  = id => document.getElementById(id);
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt = ts => { if(!ts)return'—'; const d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); };
+const gradeColor = g => { if(!g)return'gray'; if(g.startsWith('A'))return'green'; if(g.startsWith('B'))return'blue'; if(g.startsWith('C'))return'orange'; if(g==='D')return'red'; if(g==='F')return'darkred'; return'gray'; };
+
+function show(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
+  $(id)?.classList.remove('hidden');
+}
+
 function toast(msg, type='info') {
-  const t = document.createElement('div'); t.className=`toast toast-${type}`; t.textContent=msg;
+  const t=document.createElement('div'); t.className=`toast toast-${type}`; t.textContent=msg;
   document.body.appendChild(t); setTimeout(()=>t.remove(),3500);
 }
-function fmt(ts) { if(!ts)return'—'; const d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); }
-function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function gradeColor(g) { if(!g)return'gray'; if(g.startsWith('A'))return'green'; if(g.startsWith('B'))return'blue'; if(g.startsWith('C'))return'orange'; if(g==='D')return'red'; if(g==='F')return'darkred'; return'gray'; }
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  СОСТОЯНИЕ
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 let currentUser      = null;
 let userProfile      = null;
 let selectedCourseId = null;
-let selectedTopicId  = null;
+let accessCourseId   = null;
 let accessTopicId    = null;
-let topicBlocks      = [];   // массив блоков редактора тем
-let logoUrl          = '';   // url логотипа
 
-// ════════════════════════════════════════════════════════════════
-//  ЛОГОТИП — загрузка из настроек
-// ════════════════════════════════════════════════════════════════
-async function loadLogo() {
-  try {
-    const snap = await getDoc(doc(db,'settings','general'));
-    if (snap.exists() && snap.data().logoUrl) {
-      logoUrl = snap.data().logoUrl;
-      applyLogo(logoUrl);
-    }
-  } catch(e) {}
-}
+// Блоки текущего редактора темы — глубокая копия из Firestore
+let editorBlocks = [];
+let editorTopicId   = null;  // null = новая тема
+let editorCourseId  = null;
 
-function applyLogo(url) {
-  document.querySelectorAll('.site-logo-img').forEach(el => {
-    el.src = url; el.style.display = 'block';
-  });
-  document.querySelectorAll('.site-logo-text').forEach(el => el.style.display = 'none');
-}
-
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  АВТОРИЗАЦИЯ
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 onAuthStateChanged(auth, async user => {
-  await loadLogo();
   if (!user) { show('screen-login'); return; }
   const snap = await getDoc(doc(db,'users',user.uid));
   if (!snap.exists()) { await signOut(auth); show('screen-login'); toast('Пользователь не найден','error'); return; }
-  currentUser = user; userProfile = snap.data();
+  currentUser = user;
+  userProfile = snap.data();
   applyNav();
   if      (userProfile.role==='admin')   { await loadAdminCourses(); show('screen-admin-courses'); }
   else if (userProfile.role==='teacher') { await loadTeacherAnswers(); show('screen-teacher'); }
@@ -93,342 +89,345 @@ onAuthStateChanged(auth, async user => {
 });
 
 $('btn-login').addEventListener('click', async () => {
-  const email = $('login-email').value.trim();
-  const pass  = $('login-pass').value;
-  if (!email||!pass) { toast('Заполни все поля','error'); return; }
+  const email=$('login-email').value.trim(), pass=$('login-pass').value;
+  if(!email||!pass){toast('Заполни все поля','error');return;}
   try { await signInWithEmailAndPassword(auth,email,pass); }
-  catch(e) { toast('Неверный email или пароль','error'); }
+  catch { toast('Неверный email или пароль','error'); }
 });
 
 $('btn-logout').addEventListener('click', async () => {
-  await signOut(auth); $('app-nav').classList.add('hidden');
-  currentUser=null; userProfile=null; show('screen-login');
+  await signOut(auth);
+  $('app-nav').classList.add('hidden');
+  currentUser=null; userProfile=null;
+  show('screen-login');
 });
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  НАВИГАЦИЯ
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 function applyNav() {
   $('app-nav').classList.remove('hidden');
   $('nav-username').textContent = userProfile.name||currentUser.email;
-  $('nav-role').textContent = userProfile.role==='admin'?'Администратор':userProfile.role==='teacher'?'Преподаватель':'Студент';
+  $('nav-role-badge').textContent = userProfile.role==='admin'?'Администратор':userProfile.role==='teacher'?'Преподаватель':'Студент';
   const a=userProfile.role==='admin', t=userProfile.role==='teacher', s=userProfile.role==='student';
-  ['nav-courses-admin','nav-users','nav-answers-admin','nav-grades-admin','nav-settings-admin'].forEach(id=>$(id).classList.toggle('hidden',!a));
-  ['nav-answers-teacher','nav-grades-teacher'].forEach(id=>$(id).classList.toggle('hidden',!t));
-  ['nav-my-courses','nav-my-grades'].forEach(id=>$(id).classList.toggle('hidden',!s));
+  ['nav-courses-a','nav-users-a','nav-answers-a','nav-grades-a'].forEach(id=>$(id).classList.toggle('hidden',!a));
+  ['nav-answers-t','nav-grades-t'].forEach(id=>$(id).classList.toggle('hidden',!t));
+  ['nav-courses-s','nav-grades-s'].forEach(id=>$(id).classList.toggle('hidden',!s));
 }
 
-$('nav-courses-admin').addEventListener('click',  ()=>{ loadAdminCourses(); show('screen-admin-courses'); });
-$('nav-users').addEventListener('click',          ()=>{ loadAdminUsers();   show('screen-admin-users'); });
-$('nav-answers-admin').addEventListener('click',  ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
-$('nav-grades-admin').addEventListener('click',   ()=>{ loadGradesJournal(); show('screen-grades'); });
-$('nav-settings-admin').addEventListener('click', ()=>{ show('screen-settings'); });
-$('nav-answers-teacher').addEventListener('click',()=>{ loadTeacherAnswers(); show('screen-teacher'); });
-$('nav-grades-teacher').addEventListener('click', ()=>{ loadGradesJournal(); show('screen-grades'); });
-$('nav-my-courses').addEventListener('click',     ()=>{ loadStudentCourses(); show('screen-student-courses'); });
-$('nav-my-grades').addEventListener('click',      ()=>{ loadStudentGrades(); show('screen-my-grades'); });
+$('nav-courses-a').addEventListener('click',  ()=>{ loadAdminCourses();   show('screen-admin-courses'); });
+$('nav-users-a').addEventListener('click',    ()=>{ loadAdminUsers();     show('screen-admin-users'); });
+$('nav-answers-a').addEventListener('click',  ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
+$('nav-grades-a').addEventListener('click',   ()=>{ loadGradesJournal();  show('screen-grades'); });
+$('nav-answers-t').addEventListener('click',  ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
+$('nav-grades-t').addEventListener('click',   ()=>{ loadGradesJournal();  show('screen-grades'); });
+$('nav-courses-s').addEventListener('click',  ()=>{ loadStudentCourses(); show('screen-student-courses'); });
+$('nav-grades-s').addEventListener('click',   ()=>{ loadStudentGrades();  show('screen-my-grades'); });
 
-// ════════════════════════════════════════════════════════════════
-//  НАСТРОЙКИ — ЛОГОТИП
-// ════════════════════════════════════════════════════════════════
-$('logo-file-input').addEventListener('change', async e => {
-  const file = e.target.files[0]; if(!file) return;
-  // Загружаем в Firebase Storage
-  try {
-    $('btn-save-logo').textContent = 'Загружаю...';
-    $('btn-save-logo').disabled = true;
-    const storageRef = ref(storage, 'settings/logo');
-    await uploadBytes(storageRef, file);
-    const url = await getDownloadURL(storageRef);
-    await setDoc(doc(db,'settings','general'), { logoUrl: url }, { merge:true });
-    logoUrl = url; applyLogo(url);
-    toast('Логотип сохранён','success');
-  } catch(e) {
-    toast('Ошибка загрузки: '+e.message,'error');
-  } finally {
-    $('btn-save-logo').textContent = 'Загрузить логотип';
-    $('btn-save-logo').disabled = false;
-  }
-});
-$('btn-save-logo').addEventListener('click', ()=>$('logo-file-input').click());
-
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  АДМИНИСТРАТОР — КУРСЫ
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 async function loadAdminCourses() {
-  const snap = await getDocs(collection(db,'courses'));
-  const list = $('admin-courses-list'); list.innerHTML='';
-  if (snap.empty) { list.innerHTML='<p class="empty-msg">Курсов пока нет. Создай первый!</p>'; return; }
-  snap.forEach(d => {
-    const c = d.data();
-    const card = document.createElement('div'); card.className='card';
+  const snap=await getDocs(collection(db,'courses'));
+  const list=$('admin-courses-list'); list.innerHTML='';
+  if(snap.empty){list.innerHTML='<p class="empty-msg">Курсов нет. Создай первый!</p>';return;}
+  snap.forEach(d=>{
+    const c=d.data(); const card=document.createElement('div'); card.className='card';
     card.innerHTML=`
       <div class="card-info"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
       <div class="card-actions">
-        <button class="btn btn-secondary" onclick="openAdminTopics('${d.id}','${esc(c.title)}')">Темы</button>
-        <button class="btn btn-accent"    onclick="openCourseAccess('${d.id}','${esc(c.title)}')">Доступ</button>
-        <button class="btn btn-ghost"     onclick="deleteCourse('${d.id}')">Удалить</button>
+        <button class="btn btn-sm btn-secondary" onclick="goAdminTopics('${d.id}','${esc(c.title)}')">Темы</button>
+        <button class="btn btn-sm btn-accent"    onclick="openCourseAccess('${d.id}','${esc(c.title)}')">Доступ студентов</button>
+        <button class="btn btn-sm btn-ghost"     onclick="deleteCourse('${d.id}')">Удалить</button>
       </div>`;
     list.appendChild(card);
   });
 }
 
-// ── Создать курс ──
-$('btn-create-course').addEventListener('click', ()=>{ $('modal-course').classList.remove('hidden'); });
-$('btn-course-cancel').addEventListener('click', ()=>{ $('modal-course').classList.add('hidden'); });
+$('btn-create-course').addEventListener('click',()=>$('modal-course').classList.remove('hidden'));
+$('btn-course-cancel').addEventListener('click',()=>$('modal-course').classList.add('hidden'));
 $('btn-course-save').addEventListener('click', async ()=>{
-  const title=$('course-title-input').value.trim(), desc=$('course-desc-input').value.trim();
+  const title=$('inp-course-title').value.trim(), desc=$('inp-course-desc').value.trim();
   if(!title){toast('Введи название','error');return;}
   await addDoc(collection(db,'courses'),{title,description:desc,createdAt:serverTimestamp()});
-  $('modal-course').classList.add('hidden');
-  $('course-title-input').value=''; $('course-desc-input').value='';
+  $('modal-course').classList.add('hidden'); $('inp-course-title').value=''; $('inp-course-desc').value='';
   toast('Курс создан','success'); loadAdminCourses();
 });
-window.deleteCourse = async id => {
-  if(!confirm('Удалить курс?'))return;
-  await deleteDoc(doc(db,'courses',id)); toast('Удалён'); loadAdminCourses();
-};
+window.deleteCourse=async id=>{ if(!confirm('Удалить курс и все темы?'))return; await deleteDoc(doc(db,'courses',id)); toast('Удалён'); loadAdminCourses(); };
 
-// ════════════════════════════════════════════════════════════════
-//  ДОСТУП К КУРСУ (кто вообще видит курс)
-// ════════════════════════════════════════════════════════════════
-let accessCourseId = null;
-window.openCourseAccess = async (courseId, courseTitle) => {
-  accessCourseId = courseId;
-  $('course-access-title').textContent = courseTitle;
-  const usersSnap  = await getDocs(query(collection(db,'users'),where('role','==','student')));
-  const accessSnap = await getDocs(collection(db,'courses',courseId,'enrollments'));
-  const enrolled   = new Set(); accessSnap.forEach(d=>enrolled.add(d.id));
-  const list = $('course-access-list'); list.innerHTML='';
-  if(usersSnap.empty){list.innerHTML='<p class="empty-msg">Студентов нет</p>';}
+// ══════════════════════════════════════════════════════════════
+//  ДОСТУП К КУРСУ — кто из студентов видит курс
+// ══════════════════════════════════════════════════════════════
+window.openCourseAccess=async(courseId,courseTitle)=>{
+  accessCourseId=courseId;
+  $('lbl-course-access-title').textContent=courseTitle;
+  const usersSnap=await getDocs(query(collection(db,'users'),where('role','==','student')));
+  const enrollSnap=await getDocs(collection(db,'courses',courseId,'enrollments'));
+  const enrolled=new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
+  const list=$('course-access-list'); list.innerHTML='';
+  if(usersSnap.empty){list.innerHTML='<p class="empty-msg">Студентов нет. Создай пользователей.</p>';return;}
   usersSnap.forEach(d=>{
     const u=d.data(); const row=document.createElement('div'); row.className='access-row';
-    row.innerHTML=`<label class="access-label">
-      <input type="checkbox" data-uid="${d.id}" ${enrolled.has(d.id)?'checked':''}/>
-      <span>${esc(u.name||u.email)}</span><small>${esc(u.email)}</small>
-    </label>`; list.appendChild(row);
+    row.innerHTML=`<label class="access-label"><input type="checkbox" data-uid="${d.id}" ${enrolled.has(d.id)?'checked':''}/><span>${esc(u.name||u.email)}</span><small>${esc(u.email)}</small></label>`;
+    list.appendChild(row);
   });
   $('modal-course-access').classList.remove('hidden');
 };
 $('btn-course-access-cancel').addEventListener('click',()=>$('modal-course-access').classList.add('hidden'));
-$('btn-course-access-save').addEventListener('click', async ()=>{
-  const cbs = document.querySelectorAll('#course-access-list input[type=checkbox]');
+$('btn-course-access-save').addEventListener('click',async()=>{
+  const cbs=document.querySelectorAll('#course-access-list input[type=checkbox]');
   await Promise.all([...cbs].map(cb=>{
     const r=doc(db,'courses',accessCourseId,'enrollments',cb.dataset.uid);
-    return cb.checked?setDoc(r,{enrolledAt:serverTimestamp()}):deleteDoc(r);
+    return cb.checked ? setDoc(r,{at:serverTimestamp()}) : deleteDoc(r);
   }));
-  toast('Доступ обновлён','success'); $('modal-course-access').classList.add('hidden');
+  toast('Доступ к курсу сохранён','success'); $('modal-course-access').classList.add('hidden');
 });
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  АДМИНИСТРАТОР — ТЕМЫ
-// ════════════════════════════════════════════════════════════════
-window.openAdminTopics = async (courseId, courseTitle) => {
+// ══════════════════════════════════════════════════════════════
+window.goAdminTopics=async(courseId,courseTitle)=>{
   selectedCourseId=courseId;
-  $('admin-topics-course-title').textContent=courseTitle;
+  $('lbl-admin-course-title').textContent=courseTitle;
   await loadAdminTopics(); show('screen-admin-topics');
 };
 
 async function loadAdminTopics() {
-  const snap = await getDocs(collection(db,'courses',selectedCourseId,'topics'));
-  const list = $('admin-topics-list'); list.innerHTML='';
+  const snap=await getDocs(collection(db,'courses',selectedCourseId,'topics'));
+  const list=$('admin-topics-list'); list.innerHTML='';
   const topics=[]; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
   topics.sort((a,b)=>(a.order||0)-(b.order||0));
   if(!topics.length){list.innerHTML='<p class="empty-msg">Тем нет. Создай первую!</p>';return;}
   topics.forEach(t=>{
+    const blockCount=(t.blocks||[]).length;
     const card=document.createElement('div'); card.className='card';
     card.innerHTML=`
-      <div class="card-info"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${(t.blocks||[]).length}</p></div>
+      <div class="card-info"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${blockCount}</p></div>
       <div class="card-actions">
-        <button class="btn btn-secondary" onclick="openTopicEditor('${t.id}')">Редактировать</button>
-        <button class="btn btn-accent"    onclick="openTopicAccess('${t.id}','${esc(t.title)}')">Доступ</button>
-        <button class="btn btn-ghost"     onclick="deleteTopic('${t.id}')">Удалить</button>
+        <button class="btn btn-sm btn-secondary" onclick="openTopicEditor('${t.id}')">✏ Редактировать</button>
+        <button class="btn btn-sm btn-accent"    onclick="openTopicAccess('${t.id}','${esc(t.title)}')">🔓 Доступ</button>
+        <button class="btn btn-sm btn-ghost"     onclick="deleteTopic('${t.id}')">Удалить</button>
       </div>`;
     list.appendChild(card);
   });
 }
 
 $('btn-back-to-courses').addEventListener('click',()=>{ loadAdminCourses(); show('screen-admin-courses'); });
-$('btn-create-topic').addEventListener('click',()=>{
-  selectedTopicId=null; topicBlocks=[];
-  $('topic-editor-title').textContent='Новая тема';
-  $('topic-title-inp').value=''; $('topic-order-inp').value='0';
-  renderBlockEditor(); show('screen-topic-editor');
+$('btn-new-topic').addEventListener('click',()=>{
+  editorTopicId=null; editorCourseId=selectedCourseId; editorBlocks=[];
+  $('inp-topic-title').value=''; $('inp-topic-order').value='0';
+  $('lbl-editor-title').textContent='Новая тема';
+  renderEditor(); show('screen-topic-editor');
 });
 
-window.openTopicEditor = async topicId => {
-  selectedTopicId=topicId;
+window.openTopicEditor=async topicId=>{
+  editorTopicId=topicId; editorCourseId=selectedCourseId;
   const snap=await getDoc(doc(db,'courses',selectedCourseId,'topics',topicId));
   const t=snap.data();
-  $('topic-editor-title').textContent='Редактировать тему';
-  $('topic-title-inp').value=t.title||'';
-  $('topic-order-inp').value=t.order||0;
-  topicBlocks = JSON.parse(JSON.stringify(t.blocks||[]));
-  renderBlockEditor(); show('screen-topic-editor');
+  $('inp-topic-title').value=t.title||'';
+  $('inp-topic-order').value=t.order||0;
+  $('lbl-editor-title').textContent='Редактировать тему';
+  // Глубокая копия блоков из Firestore
+  editorBlocks=JSON.parse(JSON.stringify(t.blocks||[]));
+  renderEditor(); show('screen-topic-editor');
 };
 
-window.deleteTopic = async id=>{
-  if(!confirm('Удалить тему?'))return;
-  await deleteDoc(doc(db,'courses',selectedCourseId,'topics',id));
-  toast('Удалено'); loadAdminTopics();
-};
+window.deleteTopic=async id=>{ if(!confirm('Удалить тему?'))return; await deleteDoc(doc(db,'courses',selectedCourseId,'topics',id)); toast('Удалено'); loadAdminTopics(); };
 
-$('btn-topic-editor-back').addEventListener('click',()=>{ loadAdminTopics(); show('screen-admin-topics'); });
-$('btn-topic-editor-save').addEventListener('click', async ()=>{
-  const title=$('topic-title-inp').value.trim();
-  if(!title){toast('Введи название','error');return;}
-  const data={title,order:parseInt($('topic-order-inp').value)||0,blocks:topicBlocks,updatedAt:serverTimestamp()};
-  if(selectedTopicId){
-    await updateDoc(doc(db,'courses',selectedCourseId,'topics',selectedTopicId),data);
-    toast('Тема сохранена','success');
-  } else {
-    data.createdAt=serverTimestamp();
-    await addDoc(collection(db,'courses',selectedCourseId,'topics'),data);
-    toast('Тема создана','success');
-  }
-  loadAdminTopics(); show('screen-admin-topics');
+$('btn-editor-back').addEventListener('click',()=>{ loadAdminTopics(); show('screen-admin-topics'); });
+
+$('btn-editor-save').addEventListener('click',async()=>{
+  const title=$('inp-topic-title').value.trim();
+  if(!title){toast('Введи название темы','error');return;}
+
+  // Читаем актуальные значения из DOM перед сохранением
+  syncEditorFromDOM();
+
+  // Валидация: убираем пустые блоки
+  const blocks=editorBlocks.filter(b=>{
+    if(b.type==='text')     return (b.content||'').trim()!=='';
+    if(b.type==='image')    return (b.url||'').trim()!=='';
+    if(b.type==='video')    return (b.url||'').trim()!=='';
+    if(b.type==='question') return (b.question||'').trim()!=='';
+    return true;
+  });
+
+  const data={
+    title, order:parseInt($('inp-topic-order').value)||0,
+    blocks, updatedAt:serverTimestamp()
+  };
+
+  try {
+    if(editorTopicId){
+      await updateDoc(doc(db,'courses',editorCourseId,'topics',editorTopicId),data);
+      toast('Тема сохранена ✓','success');
+    } else {
+      data.createdAt=serverTimestamp();
+      await addDoc(collection(db,'courses',editorCourseId,'topics'),data);
+      toast('Тема создана ✓','success');
+    }
+    selectedCourseId=editorCourseId;
+    await loadAdminTopics(); show('screen-admin-topics');
+  } catch(e){ toast('Ошибка сохранения: '+e.message,'error'); console.error(e); }
 });
 
-// ── РЕДАКТОР БЛОКОВ ──────────────────────────────────────────────
-function renderBlockEditor() {
-  const container = $('blocks-container'); container.innerHTML='';
-  topicBlocks.forEach((block,i)=>{
-    const wrap=document.createElement('div'); wrap.className='block-editor-item';
-    const controls=`
-      <div class="block-controls">
-        <span class="block-type-label">${blockLabel(block.type)}</span>
-        <div class="block-ctrl-btns">
-          ${i>0?`<button class="bctrl" onclick="moveBlock(${i},-1)" title="Вверх">↑</button>`:''}
-          ${i<topicBlocks.length-1?`<button class="bctrl" onclick="moveBlock(${i},1)" title="Вниз">↓</button>`:''}
-          <button class="bctrl bctrl-del" onclick="removeBlock(${i})" title="Удалить">✕</button>
-        </div>
-      </div>`;
-    let inner='';
+// Синхронизация DOM → editorBlocks перед сохранением
+function syncEditorFromDOM() {
+  editorBlocks.forEach((block,i)=>{
     if(block.type==='text'){
-      inner=`<textarea class="block-textarea" oninput="topicBlocks[${i}].content=this.value" placeholder="Введи текст...">${esc(block.content||'')}</textarea>`;
+      const el=document.getElementById('block-content-'+i);
+      if(el) block.content=el.value;
     } else if(block.type==='image'){
-      inner=`
-        <div class="block-image-editor">
-          <input class="block-input" type="url" value="${esc(block.url||'')}" oninput="topicBlocks[${i}].url=this.value" placeholder="Ссылка на картинку (https://...)"/>
-          <p class="block-hint">Или загрузи файл напрямую:</p>
-          <input type="file" accept="image/*" onchange="uploadBlockImage(event,${i})" class="file-input-small"/>
-          ${block.url?`<img src="${esc(block.url)}" class="block-img-preview" onerror="this.style.display='none'"/>`:''}
-        </div>`;
+      const el=document.getElementById('block-url-'+i);
+      if(el) block.url=el.value.trim();
     } else if(block.type==='video'){
-      inner=`
-        <input class="block-input" type="url" value="${esc(block.url||'')}" oninput="topicBlocks[${i}].url=this.value"
-          placeholder="YouTube: https://youtube.com/watch?v=... | ВКонтакте: https://vkvideo.ru/video... | Прямая ссылка на .mp4"/>
-        <p class="block-hint">Поддерживается: YouTube, ВКонтакте (vkvideo.ru), прямые ссылки на mp4</p>`;
+      const el=document.getElementById('block-url-'+i);
+      if(el) block.url=el.value.trim();
     } else if(block.type==='question'){
-      inner=`<textarea class="block-textarea block-textarea-sm" oninput="topicBlocks[${i}].question=this.value" placeholder="Вопрос для студента...">${esc(block.question||'')}</textarea>`;
+      const el=document.getElementById('block-question-'+i);
+      if(el) block.question=el.value;
     }
-    wrap.innerHTML=controls+`<div class="block-inner">${inner}</div>`;
+  });
+}
+
+// ── РЕДАКТОР БЛОКОВ ─────────────────────────────────────────────
+$('btn-add-text').addEventListener('click',()=>{ syncEditorFromDOM(); editorBlocks.push({type:'text',content:''}); renderEditor(); });
+$('btn-add-image').addEventListener('click',()=>{ syncEditorFromDOM(); editorBlocks.push({type:'image',url:''}); renderEditor(); });
+$('btn-add-video').addEventListener('click',()=>{ syncEditorFromDOM(); editorBlocks.push({type:'video',url:''}); renderEditor(); });
+$('btn-add-question').addEventListener('click',()=>{ syncEditorFromDOM(); editorBlocks.push({type:'question',question:''}); renderEditor(); });
+
+window.moveBlock=(i,dir)=>{ syncEditorFromDOM(); const b=editorBlocks.splice(i,1)[0]; editorBlocks.splice(i+dir,0,b); renderEditor(); };
+window.removeBlock=i=>{ if(!confirm('Удалить блок?'))return; syncEditorFromDOM(); editorBlocks.splice(i,1); renderEditor(); };
+
+function blockIcon(type){ return type==='text'?'📝':type==='image'?'🖼':type==='video'?'▶':'❓'; }
+function blockName(type){ return type==='text'?'Текст':type==='image'?'Картинка':type==='video'?'Видео':'Вопрос'; }
+
+function renderEditor() {
+  const container=$('blocks-container'); container.innerHTML='';
+  if(!editorBlocks.length){
+    container.innerHTML='<p class="empty-msg">Нет блоков. Добавь блок кнопками выше.</p>'; return;
+  }
+  editorBlocks.forEach((block,i)=>{
+    const wrap=document.createElement('div'); wrap.className='block-wrap';
+    const isFirst=i===0, isLast=i===editorBlocks.length-1;
+    let bodyHtml='';
+
+    if(block.type==='text'){
+      bodyHtml=`<textarea id="block-content-${i}" class="block-textarea" placeholder="Введи текст...">${esc(block.content||'')}</textarea>`;
+
+    } else if(block.type==='image'){
+      bodyHtml=`
+        <label class="block-label">Прямая ссылка на картинку (https://...)</label>
+        <input id="block-url-${i}" type="url" class="block-input" value="${esc(block.url||'')}" placeholder="https://example.com/photo.jpg"/>
+        <p class="block-hint">Загрузи картинку на <a href="https://imgbb.com" target="_blank">imgbb.com</a> или <a href="https://imgur.com" target="_blank">imgur.com</a> — они бесплатны — и вставь прямую ссылку сюда.</p>
+        ${block.url?`<img src="${esc(block.url)}" class="block-preview" onerror="this.style.display='none'"/>`:'' }`;
+
+    } else if(block.type==='video'){
+      bodyHtml=`
+        <label class="block-label">Ссылка или код для встраивания видео</label>
+        <textarea id="block-url-${i}" class="block-textarea block-textarea-sm" placeholder="Вставь ссылку YouTube / ВКонтакте / vkvideo.ru ИЛИ весь код &lt;iframe ...&gt;">${esc(block.url||'')}</textarea>
+        <p class="block-hint">Поддерживается: YouTube, ВКонтакте (ссылка или iframe-код), прямая ссылка на .mp4</p>`;
+
+    } else if(block.type==='question'){
+      bodyHtml=`
+        <label class="block-label">Вопрос для студента</label>
+        <textarea id="block-question-${i}" class="block-textarea block-textarea-sm" placeholder="Напиши вопрос...">${esc(block.question||'')}</textarea>`;
+    }
+
+    wrap.innerHTML=`
+      <div class="block-header">
+        <span class="block-type">${blockIcon(block.type)} ${blockName(block.type)}</span>
+        <div class="block-btns">
+          ${!isFirst?`<button class="bbtn" onclick="moveBlock(${i},-1)">↑</button>`:''}
+          ${!isLast?`<button class="bbtn" onclick="moveBlock(${i},1)">↓</button>`:''}
+          <button class="bbtn bbtn-del" onclick="removeBlock(${i})">✕</button>
+        </div>
+      </div>
+      <div class="block-body">${bodyHtml}</div>`;
     container.appendChild(wrap);
   });
 }
 
-function blockLabel(type){ return type==='text'?'📝 Текст':type==='image'?'🖼 Картинка':type==='video'?'▶ Видео':'❓ Вопрос'; }
+// ══════════════════════════════════════════════════════════════
+//  ДОСТУП К ТЕМЕ
+// ══════════════════════════════════════════════════════════════
+window.openTopicAccess=async(topicId,topicTitle)=>{
+  accessTopicId=topicId;
+  $('lbl-access-topic-name').textContent=topicTitle;
 
-window.moveBlock = (i,dir)=>{ const b=topicBlocks.splice(i,1)[0]; topicBlocks.splice(i+dir,0,b); renderBlockEditor(); };
-window.removeBlock = i=>{ if(!confirm('Удалить блок?'))return; topicBlocks.splice(i,1); renderBlockEditor(); };
+  // Берём только студентов, записанных на этот курс
+  const enrollSnap=await getDocs(collection(db,'courses',selectedCourseId,'enrollments'));
+  const enrolled=new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
 
-$('btn-add-text').addEventListener('click',   ()=>{ topicBlocks.push({type:'text',content:''}); renderBlockEditor(); });
-$('btn-add-image').addEventListener('click',  ()=>{ topicBlocks.push({type:'image',url:''}); renderBlockEditor(); });
-$('btn-add-video').addEventListener('click',  ()=>{ topicBlocks.push({type:'video',url:''}); renderBlockEditor(); });
-$('btn-add-question').addEventListener('click',()=>{ topicBlocks.push({type:'question',question:''}); renderBlockEditor(); });
+  // Текущий доступ к теме
+  const accessSnap=await getDocs(collection(db,'courses',selectedCourseId,'topics',topicId,'access'));
+  const allowed=new Set(); accessSnap.forEach(d=>allowed.add(d.id));
 
-// Загрузка картинки в Firebase Storage
-window.uploadBlockImage = async (e,idx)=>{
-  const file=e.target.files[0]; if(!file)return;
-  const btn=e.target; btn.disabled=true; btn.value='Загружаю...';
-  try {
-    const storageRef=ref(storage,`topics/${Date.now()}_${file.name}`);
-    await uploadBytes(storageRef,file);
-    const url=await getDownloadURL(storageRef);
-    topicBlocks[idx].url=url;
-    renderBlockEditor();
-    toast('Картинка загружена','success');
-  } catch(err){
-    toast('Ошибка загрузки картинки: '+err.message,'error');
-    btn.disabled=false; btn.value='Выбрать файл';
-  }
-};
+  // Загружаем профили студентов курса
+  const list=$('topic-access-list'); list.innerHTML='';
+  if(!enrolled.size){list.innerHTML='<p class="empty-msg">На этот курс ещё никто не записан. Сначала открой доступ к курсу.</p>';$('modal-topic-access').classList.remove('hidden');return;}
 
-// ── ДОСТУП К ТЕМЕ ─────────────────────────────────────────────
-window.openTopicAccess = async (topicId,topicTitle)=>{
-  accessTopicId=topicId; $('access-topic-name').textContent=topicTitle;
-  const usersSnap  = await getDocs(query(collection(db,'users'),where('role','==','student')));
-  // Берём только студентов у которых есть доступ к курсу
-  const enrollSnap = await getDocs(collection(db,'courses',selectedCourseId,'enrollments'));
-  const enrolled   = new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
-  const accessSnap = await getDocs(collection(db,'courses',selectedCourseId,'topics',topicId,'access'));
-  const allowed    = new Set(); accessSnap.forEach(d=>allowed.add(d.id));
-  const list=$('access-students-list'); list.innerHTML='';
-  let hasEnrolled=false;
+  const usersSnap=await getDocs(query(collection(db,'users'),where('role','==','student')));
+  let shown=0;
   usersSnap.forEach(d=>{
-    if(!enrolled.has(d.id))return; // показываем только зачисленных на курс
-    hasEnrolled=true;
+    if(!enrolled.has(d.id))return;
+    shown++;
     const u=d.data(); const row=document.createElement('div'); row.className='access-row';
-    row.innerHTML=`<label class="access-label">
-      <input type="checkbox" data-uid="${d.id}" ${allowed.has(d.id)?'checked':''}/>
-      <span>${esc(u.name||u.email)}</span><small>${esc(u.email)}</small>
-    </label>`; list.appendChild(row);
+    row.innerHTML=`<label class="access-label"><input type="checkbox" data-uid="${d.id}" ${allowed.has(d.id)?'checked':''}/><span>${esc(u.name||u.email)}</span><small>${esc(u.email)}</small></label>`;
+    list.appendChild(row);
   });
-  if(!hasEnrolled)list.innerHTML='<p class="empty-msg">Нет студентов записанных на этот курс. Сначала открой доступ к курсу.</p>';
-  $('modal-access').classList.remove('hidden');
+  if(!shown)list.innerHTML='<p class="empty-msg">Нет студентов записанных на этот курс.</p>';
+  $('modal-topic-access').classList.remove('hidden');
 };
-$('btn-access-cancel').addEventListener('click',()=>$('modal-access').classList.add('hidden'));
-$('btn-access-save').addEventListener('click', async ()=>{
-  const cbs=document.querySelectorAll('#access-students-list input[type=checkbox]');
+$('btn-topic-access-cancel').addEventListener('click',()=>$('modal-topic-access').classList.add('hidden'));
+$('btn-topic-access-save').addEventListener('click',async()=>{
+  const cbs=document.querySelectorAll('#topic-access-list input[type=checkbox]');
+  if(!cbs.length){$('modal-topic-access').classList.add('hidden');return;}
   await Promise.all([...cbs].map(cb=>{
     const r=doc(db,'courses',selectedCourseId,'topics',accessTopicId,'access',cb.dataset.uid);
-    return cb.checked?setDoc(r,{grantedAt:serverTimestamp()}):deleteDoc(r);
+    return cb.checked ? setDoc(r,{at:serverTimestamp()}) : deleteDoc(r);
   }));
-  toast('Доступ к теме обновлён','success'); $('modal-access').classList.add('hidden');
+  toast('Доступ к теме сохранён','success'); $('modal-topic-access').classList.add('hidden');
 });
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 //  ПОЛЬЗОВАТЕЛИ
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
 async function loadAdminUsers() {
   const snap=await getDocs(collection(db,'users')); const list=$('admin-users-list'); list.innerHTML='';
   if(snap.empty){list.innerHTML='<p class="empty-msg">Пользователей нет</p>';return;}
   snap.forEach(d=>{
     const u=d.data(); const rl=u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
     const card=document.createElement('div'); card.className='card';
-    card.innerHTML=`
-      <div class="card-info"><h3>${esc(u.name||'—')}</h3><p>${esc(u.email)} · <span class="role-badge role-${u.role}">${rl}</span></p></div>
-      <div class="card-actions"><button class="btn btn-ghost" onclick="deleteUser('${d.id}')">Удалить</button></div>`;
+    card.innerHTML=`<div class="card-info"><h3>${esc(u.name||'—')}</h3><p>${esc(u.email)} · <span class="role-badge role-${u.role}">${rl}</span></p></div>
+      <div class="card-actions"><button class="btn btn-sm btn-ghost" onclick="deleteUser('${d.id}')">Удалить</button></div>`;
     list.appendChild(card);
   });
 }
 $('btn-create-user').addEventListener('click',()=>$('modal-user').classList.remove('hidden'));
 $('btn-user-cancel').addEventListener('click',()=>$('modal-user').classList.add('hidden'));
-$('btn-user-save').addEventListener('click', async ()=>{
-  const name=$('user-name-input').value.trim(), email=$('user-email-input').value.trim(),
-        pass=$('user-pass-input').value, role=$('user-role-select').value;
+$('btn-user-save').addEventListener('click',async()=>{
+  const name=$('inp-user-name').value.trim(), email=$('inp-user-email').value.trim(),
+        pass=$('inp-user-pass').value, role=$('sel-user-role').value;
   if(!name||!email||!pass){toast('Заполни все поля','error');return;}
-  try {
+  try{
     const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({email,password:pass,returnSecureToken:false})
     });
     const data=await res.json();
-    if(data.error){toast(data.error.message,'error');return;}
+    if(data.error){toast('Ошибка: '+data.error.message,'error');return;}
     await setDoc(doc(db,'users',data.localId),{name,email,role,createdAt:serverTimestamp()});
-    toast('Создан','success'); $('modal-user').classList.add('hidden');
-    ['user-name-input','user-email-input','user-pass-input'].forEach(id=>$(id).value='');
+    toast('Пользователь создан','success'); $('modal-user').classList.add('hidden');
+    ['inp-user-name','inp-user-email','inp-user-pass'].forEach(id=>$(id).value='');
     loadAdminUsers();
-  } catch(e){toast('Ошибка: '+e.message,'error');}
+  }catch(e){toast('Ошибка: '+e.message,'error');}
 });
-window.deleteUser = async uid=>{
-  if(!confirm('Удалить пользователя?'))return;
-  await deleteDoc(doc(db,'users',uid)); toast('Удалён из базы'); loadAdminUsers();
-};
+window.deleteUser=async uid=>{ if(!confirm('Удалить?'))return; await deleteDoc(doc(db,'users',uid)); toast('Удалён'); loadAdminUsers(); };
 
-// ════════════════════════════════════════════════════════════════
-//  ОТВЕТЫ + ОЦЕНКИ (УЧИТЕЛЬ/ADMIN)
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  ОТВЕТЫ + ОЦЕНКИ (УЧИТЕЛЬ / ADMIN)
+// ══════════════════════════════════════════════════════════════
 async function loadTeacherAnswers() {
   const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
   const list=$('teacher-answers-list'); list.innerHTML='';
@@ -442,103 +441,92 @@ async function loadTeacherAnswers() {
     card.innerHTML=`
       <div class="answer-header">
         <div><strong>${esc(a.studentName||a.studentEmail)}</strong>
-        <span class="muted"> · ${esc(a.topicTitle||'')} · ${fmt(a.createdAt)}</span>${gh}</div>
+          <span class="muted"> · ${esc(a.topicTitle||'')} · ${fmt(a.createdAt)}</span>${gh}
+        </div>
         <span class="status-badge ${sc}">${sl}</span>
       </div>
-      <div class="answer-questions">${(a.answers||[]).map((ans,i)=>`
+      <div class="answer-qs">${(a.answers||[]).map((ans,i)=>`
         <div class="qa-block">
-          <p class="question-text">Вопрос ${i+1}: ${esc(a.questions?.[i]||'')}</p>
-          <p class="answer-text">${esc(ans)}</p>
+          <p class="q-text">Вопрос ${i+1}: ${esc((a.questions||[])[i]||'')}</p>
+          <p class="a-text">${esc(ans)}</p>
         </div>`).join('')}
       </div>
-      <div class="answer-feedback-row">
-        <div class="feedback-left">
+      <div class="feedback-row">
+        <div class="fb-left">
           <label class="small-label">Оценка</label>
-          <select class="grade-select" id="grade-sel-${d.id}">
+          <select class="grade-select" id="gs-${d.id}">
             <option value="">— —</option>
             ${['A','A-','B+','B','B-','C+','C','C-','D','F'].map(g=>`<option ${a.grade===g?'selected':''}>${g}</option>`).join('')}
           </select>
         </div>
-        <div class="feedback-right">
+        <div class="fb-right">
           <label class="small-label">Комментарий</label>
-          <textarea class="feedback-input" id="fb-${d.id}" placeholder="Комментарий...">${esc(a.feedback||'')}</textarea>
+          <textarea class="fb-input" id="fb-${d.id}" placeholder="Комментарий...">${esc(a.feedback||'')}</textarea>
         </div>
-        <button class="btn btn-primary feedback-btn" onclick="saveAnswerFeedback('${d.id}')">Сохранить</button>
+        <button class="btn btn-primary fb-btn" onclick="saveFeedback('${d.id}')">Сохранить</button>
       </div>`;
     list.appendChild(card);
   });
 }
-
-window.saveAnswerFeedback = async id=>{
-  const feedback=$('fb-'+id).value, grade=$('grade-sel-'+id).value;
+window.saveFeedback=async id=>{
+  const feedback=$('fb-'+id).value, grade=$('gs-'+id).value;
   await updateDoc(doc(db,'answers',id),{feedback,grade,status:'checked',checkedAt:serverTimestamp(),checkedBy:currentUser.uid});
   toast('Сохранено','success'); loadTeacherAnswers();
 };
-
 $('answers-search').addEventListener('input',function(){
   const q=this.value.toLowerCase();
   document.querySelectorAll('.answer-card').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
 });
 
-// ── ЖУРНАЛ ОЦЕНОК ─────────────────────────────────────────────
+// ── Журнал оценок ──
 async function loadGradesJournal() {
   const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
-  const list=$('grades-list'); list.innerHTML='';
-  const byStudent={};
-  snap.forEach(d=>{ const a=d.data(); if(!a.grade)return; const n=a.studentName||a.studentEmail; (byStudent[n]=byStudent[n]||[]).push(a); });
-  if(!Object.keys(byStudent).length){list.innerHTML='<p class="empty-msg">Оценок нет</p>';return;}
-  Object.entries(byStudent).forEach(([name,entries])=>{
-    const sec=document.createElement('div'); sec.className='grade-student-section';
-    sec.innerHTML=`<h3 class="grade-student-name">${esc(name)}</h3>`;
+  const list=$('grades-list'); list.innerHTML=''; const by={};
+  snap.forEach(d=>{ const a=d.data(); if(!a.grade)return; const n=a.studentName||a.studentEmail; (by[n]=by[n]||[]).push(a); });
+  if(!Object.keys(by).length){list.innerHTML='<p class="empty-msg">Оценок нет</p>';return;}
+  Object.entries(by).forEach(([name,entries])=>{
+    const sec=document.createElement('div'); sec.className='grade-section';
+    sec.innerHTML=`<h3 class="grade-name">${esc(name)}</h3>`;
     entries.forEach(a=>{
       const row=document.createElement('div'); row.className='grade-row';
-      row.innerHTML=`<span class="grade-topic">${esc(a.topicTitle||'—')}</span>
-        <span class="muted">${fmt(a.checkedAt)}</span>
-        <span class="grade-badge gc-${gradeColor(a.grade)}">${esc(a.grade)}</span>`;
+      row.innerHTML=`<span class="grade-topic">${esc(a.topicTitle||'—')}</span><span class="muted">${fmt(a.checkedAt)}</span><span class="grade-badge gc-${gradeColor(a.grade)}">${esc(a.grade)}</span>`;
       sec.appendChild(row);
-    });
-    list.appendChild(sec);
+    }); list.appendChild(sec);
   });
 }
 
 async function loadStudentGrades() {
   const snap=await getDocs(query(collection(db,'answers'),where('studentId','==',currentUser.uid),orderBy('createdAt','desc')));
-  const list=$('my-grades-list'); list.innerHTML='';
-  let hasGrades=false;
-  snap.forEach(d=>{ const a=d.data(); if(!a.grade)return; hasGrades=true;
+  const list=$('my-grades-list'); list.innerHTML=''; let any=false;
+  snap.forEach(d=>{ const a=d.data(); if(!a.grade)return; any=true;
     const row=document.createElement('div'); row.className='card';
-    row.innerHTML=`
-      <div class="card-info"><h3>${esc(a.topicTitle||'—')}</h3><p class="muted">${fmt(a.checkedAt)}</p>
-      ${a.feedback?`<p class="grade-feedback-text">💬 ${esc(a.feedback)}</p>`:''}</div>
-      <span class="grade-badge grade-big gc-${gradeColor(a.grade)}">${esc(a.grade)}</span>`;
+    row.innerHTML=`<div class="card-info"><h3>${esc(a.topicTitle||'—')}</h3><p class="muted">${fmt(a.checkedAt)}</p>${a.feedback?`<p class="grade-fb">💬 ${esc(a.feedback)}</p>`:''}</div><span class="grade-badge grade-big gc-${gradeColor(a.grade)}">${esc(a.grade)}</span>`;
     list.appendChild(row);
   });
-  if(!hasGrades) list.innerHTML='<p class="empty-msg">Оценок пока нет</p>';
+  if(!any)list.innerHTML='<p class="empty-msg">Оценок пока нет</p>';
 }
 
-// ════════════════════════════════════════════════════════════════
-//  СТУДЕНТ — КУРСЫ (только те, к которым есть доступ)
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+//  СТУДЕНТ — КУРСЫ (только доступные)
+// ══════════════════════════════════════════════════════════════
 async function loadStudentCourses() {
-  const allSnap  = await getDocs(collection(db,'courses'));
-  const list = $('student-courses-list'); list.innerHTML='';
+  const allSnap=await getDocs(collection(db,'courses'));
+  const list=$('student-courses-list'); list.innerHTML='';
   const visible=[];
-  for (const d of allSnap.docs) {
-    const enrollSnap = await getDoc(doc(db,'courses',d.id,'enrollments',currentUser.uid));
-    if (enrollSnap.exists()) visible.push({id:d.id,...d.data()});
+  for(const d of allSnap.docs){
+    const e=await getDoc(doc(db,'courses',d.id,'enrollments',currentUser.uid));
+    if(e.exists()) visible.push({id:d.id,...d.data()});
   }
-  if(!visible.length){ list.innerHTML='<p class="empty-msg">Тебе пока не открыт доступ ни к одному курсу</p>'; return; }
+  if(!visible.length){list.innerHTML='<p class="empty-msg">Тебе пока не открыт доступ ни к одному курсу</p>';return;}
   visible.forEach(c=>{
     const card=document.createElement('div'); card.className='card clickable';
     card.innerHTML=`<div class="card-info"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div><div class="card-arrow">→</div>`;
-    card.addEventListener('click',()=>openStudentCourse(c.id,c.title));
-    list.appendChild(card);
+    card.addEventListener('click',()=>openStudentCourse(c.id,c.title)); list.appendChild(card);
   });
 }
 
 async function openStudentCourse(courseId,courseTitle) {
-  selectedCourseId=courseId;
-  $('student-course-title').textContent=courseTitle;
+  selectedCourseId=courseId; $('lbl-student-course').textContent=courseTitle;
   await loadStudentTopics(courseId); show('screen-student-topics');
 }
 
@@ -550,31 +538,22 @@ async function loadStudentTopics(courseId) {
   for(const t of topics){
     const aSnap=await getDoc(doc(db,'courses',courseId,'topics',t.id,'access',currentUser.uid));
     const ok=aSnap.exists();
+    const qCount=(t.blocks||[]).filter(b=>b.type==='question').length;
     const card=document.createElement('div'); card.className=`card ${ok?'clickable':'locked'}`;
-    const questionCount=(t.blocks||[]).filter(b=>b.type==='question').length;
-    card.innerHTML=`
-      <div class="topic-lock-icon">${ok?'📖':'🔒'}</div>
-      <div class="card-info">
-        <h3>${esc(t.title)}</h3>
-        <p>${ok?(questionCount?`${questionCount} вопрос(а) для ответа`:'Материал для изучения'):'Тема заблокирована'}</p>
-      </div>`;
+    card.innerHTML=`<div class="lock-icon">${ok?'📖':'🔒'}</div><div class="card-info"><h3>${esc(t.title)}</h3><p>${ok?(qCount?`${qCount} вопрос(а)`:'Материал для изучения'):'Заблокировано'}</p></div>`;
     if(ok) card.addEventListener('click',()=>openStudentTopic(t));
     list.appendChild(card);
   }
 }
 
-// ── ОТКРЫТЬ ТЕМУ ──────────────────────────────────────────────
+// ── Открыть тему ──────────────────────────────────────────────
 async function openStudentTopic(topic) {
-  selectedTopicId=topic.id;
-  $('student-topic-title').textContent=topic.title;
-
-  // Загружаем предыдущий ответ
-  const prevSnap=await getDocs(query(collection(db,'answers'),
-    where('studentId','==',currentUser.uid), where('topicId','==',topic.id)));
+  $('lbl-student-topic').textContent=topic.title;
+  const prevSnap=await getDocs(query(collection(db,'answers'),where('studentId','==',currentUser.uid),where('topicId','==',topic.id)));
   let prevData=null; prevSnap.forEach(d=>{prevData=d.data();});
 
-  const container=$('topic-content-container'); container.innerHTML='';
-  const questions=[];
+  const container=$('topic-blocks'); container.innerHTML='';
+  const questionBlocks=[];
 
   (topic.blocks||[]).forEach((block,i)=>{
     const el=document.createElement('div'); el.className='topic-block';
@@ -583,109 +562,89 @@ async function openStudentTopic(topic) {
       el.innerHTML=`<div class="topic-text">${(block.content||'').replace(/\n/g,'<br/>')}</div>`;
 
     } else if(block.type==='image'){
-      if(block.url&&block.url.trim()){
-        el.innerHTML=`<img class="topic-img" src="${esc(block.url.trim())}" alt="Изображение"
-          onerror="this.outerHTML='<div class=&quot;img-error&quot;>⚠️ Не удалось загрузить изображение.<br/><a href=&quot;${esc(block.url.trim())}&quot; target=&quot;_blank&quot; class=&quot;img-link-btn&quot;>Открыть по ссылке</a></div>'" />`;
+      const url=(block.url||'').trim();
+      if(url){
+        el.innerHTML=`<img class="topic-img" src="${esc(url)}" alt="Изображение"
+          onerror="this.outerHTML='<div class=img-err>⚠️ Изображение не загружается. <a href=&quot;${esc(url)}&quot; target=&quot;_blank&quot;>Открыть ссылку</a></div>'"/>`;
       }
 
     } else if(block.type==='video'){
       el.appendChild(buildVideoEmbed(block.url||''));
 
     } else if(block.type==='question'){
-      const qi=questions.length; questions.push({block,qi});
+      const qi=questionBlocks.length; questionBlocks.push(block);
       if(prevData){
-        // Показываем уже отправленный ответ
-        el.innerHTML=`<div class="question-block">
-          <p class="question-text-display">❓ ${esc(block.question)}</p>
-          <div class="prev-answer-box">${esc((prevData.answers||[])[qi]||'—')}</div>
-        </div>`;
+        el.innerHTML=`<div class="q-block"><p class="q-label">❓ ${esc(block.question)}</p>
+          <div class="prev-answer">${esc((prevData.answers||[])[qi]||'—')}</div></div>`;
       } else {
-        el.innerHTML=`<div class="question-block">
-          <p class="question-text-display">❓ ${esc(block.question)}</p>
-          <textarea class="answer-textarea" data-qi="${qi}" placeholder="Твой ответ..."></textarea>
-        </div>`;
+        el.innerHTML=`<div class="q-block"><p class="q-label">❓ ${esc(block.question)}</p>
+          <textarea class="answer-ta" data-qi="${qi}" placeholder="Твой ответ..."></textarea></div>`;
       }
     }
     container.appendChild(el);
   });
 
-  // Статус / кнопка отправки
-  const statusEl=$('topic-submit-area'); statusEl.innerHTML='';
-  if(questions.length){
-    if(prevData && prevData.status==='checked'){
-      const gh=prevData.grade?`<span class="grade-badge grade-big gc-${gradeColor(prevData.grade)}">${esc(prevData.grade)}</span>`:'';
-      statusEl.innerHTML=`<div class="feedback-received"><h4>✅ Преподаватель проверил ответ ${gh}</h4>
-        <p>${prevData.feedback?esc(prevData.feedback):'Комментарий не добавлен'}</p></div>`;
-    } else if(prevData && prevData.status==='pending'){
-      statusEl.innerHTML=`<div class="feedback-pending">⏳ Ответ отправлен, ожидайте проверки</div>`;
+  // Статус / кнопка
+  const statusEl=$('topic-status'); statusEl.innerHTML='';
+  if(questionBlocks.length){
+    if(prevData?.status==='checked'){
+      const gh=prevData.grade?`<span class="grade-badge gc-${gradeColor(prevData.grade)}">${esc(prevData.grade)}</span>`:'';
+      statusEl.innerHTML=`<div class="fb-received"><h4>✅ Ответ проверен ${gh}</h4><p>${prevData.feedback?esc(prevData.feedback):'Комментарий не добавлен'}</p></div>`;
+    } else if(prevData?.status==='pending'){
+      statusEl.innerHTML=`<div class="fb-pending">⏳ Ответ отправлен на проверку</div>`;
     } else {
-      const btn=document.createElement('button'); btn.className='btn btn-primary btn-wide-submit';
+      const btn=document.createElement('button'); btn.className='btn btn-primary btn-submit';
       btn.textContent='Отправить ответы на проверку';
-      btn.addEventListener('click',()=>submitAnswers(topic,questions.map(q=>q.block)));
+      btn.addEventListener('click',()=>submitAnswers(topic,questionBlocks));
       statusEl.appendChild(btn);
     }
   }
-
   show('screen-student-topic');
 }
 
-// ── ПОСТРОИТЬ EMBED ВИДЕО ──────────────────────────────────────
-function buildVideoEmbed(url) {
+// ── Видео embed ───────────────────────────────────────────────
+function buildVideoEmbed(raw) {
   const wrap=document.createElement('div'); wrap.className='video-wrap';
-  const u=url.trim();
-  if(!u){ wrap.className='hidden'; return wrap; }
+  const u=raw.trim();
+  if(!u){ wrap.classList.add('hidden'); return wrap; }
+
+  // Если это уже готовый iframe-код
+  if(u.startsWith('<iframe')){
+    const div=document.createElement('div'); div.className='video-iframe-wrap';
+    div.innerHTML=u;
+    // Растягиваем iframe на всю ширину
+    const iframe=div.querySelector('iframe');
+    if(iframe){ iframe.style.width='100%'; iframe.style.height='360px'; iframe.removeAttribute('width'); }
+    wrap.appendChild(div); return wrap;
+  }
 
   // YouTube
-  const ytMatch=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
-  if(ytMatch){
-    wrap.innerHTML=`<iframe src="https://www.youtube.com/embed/${ytMatch[1]}" frameborder="0"
-      allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>`;
+  const yt=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
+  if(yt){
+    wrap.innerHTML=`<iframe src="https://www.youtube.com/embed/${yt[1]}" frameborder="0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>`;
     return wrap;
   }
 
-  // VK Видео — vkvideo.ru или vk.com/video
-  // Формат: https://vkvideo.ru/video-XXXXXX_YYYYYY или https://vk.com/video-XXXXXX_YYYYYY
-  const vkMatch = u.match(/video(-?\d+_\d+)/);
-  if(vkMatch || u.includes('vkvideo.ru') || u.includes('vk.com/video')){
-    let embedId = '';
-    if(vkMatch) {
-      embedId = vkMatch[1]; // например -123456_789012
-    }
-    if(embedId){
-      // Извлекаем oid и id из строки вида -123456_789012
-      const parts = embedId.replace('-','').split('_');
-      const oid = embedId.startsWith('-') ? '-'+parts[0] : parts[0];
-      const vid = parts[1];
-      wrap.innerHTML=`<iframe src="https://vk.com/video_ext.php?oid=${oid}&id=${vid}&hd=2" frameborder="0"
-        allow="autoplay;encrypted-media;fullscreen;picture-in-picture" allowfullscreen></iframe>`;
-    } else {
-      // Если не распознали ID — показываем кнопку
-      wrap.innerHTML=`<div class="video-link-block">
-        <div class="video-link-icon">▶</div>
-        <p>Видео ВКонтакте</p>
-        <a class="btn btn-primary" href="${esc(u)}" target="_blank">Открыть видео</a>
-      </div>`;
-    }
+  // ВКонтакте — ссылка на видео (vkvideo.ru или vk.com/video)
+  const vk=u.match(/video(-?\d+)_(\d+)/);
+  if(vk){
+    wrap.innerHTML=`<iframe src="https://vk.com/video_ext.php?oid=${vk[1]}&id=${vk[2]}&hd=2" frameborder="0" allow="autoplay;encrypted-media;fullscreen;picture-in-picture" allowfullscreen></iframe>`;
     return wrap;
   }
 
-  // Прямая ссылка .mp4 / .webm
+  // Прямая ссылка .mp4
   if(u.match(/\.(mp4|webm|ogg)(\?|$)/i)){
     wrap.innerHTML=`<video controls><source src="${esc(u)}"/></video>`;
     return wrap;
   }
 
-  // Всё остальное — кнопка
-  wrap.innerHTML=`<div class="video-link-block">
-    <div class="video-link-icon">▶</div>
-    <p>Видео по ссылке</p>
-    <a class="btn btn-primary" href="${esc(u)}" target="_blank">Открыть видео</a>
-  </div>`;
+  // Иначе — кнопка
+  wrap.innerHTML=`<div class="video-link"><div class="vl-icon">▶</div><a class="btn btn-primary" href="${esc(u)}" target="_blank">Открыть видео</a></div>`;
   return wrap;
 }
 
-async function submitAnswers(topic, questionBlocks) {
-  const tas=document.querySelectorAll('#topic-content-container textarea.answer-textarea');
+async function submitAnswers(topic,questionBlocks){
+  const tas=document.querySelectorAll('#topic-blocks textarea.answer-ta');
   const answers=Array.from(tas).map(t=>t.value.trim());
   if(answers.some(a=>!a)){toast('Ответь на все вопросы','error');return;}
   await addDoc(collection(db,'answers'),{
@@ -698,418 +657,309 @@ async function submitAnswers(topic, questionBlocks) {
   toast('Ответы отправлены!','success'); openStudentTopic(topic);
 }
 
-$('btn-back-to-student-courses').addEventListener('click',()=>{ loadStudentCourses(); show('screen-student-courses'); });
-$('btn-back-to-student-topics').addEventListener('click', ()=>{ openStudentCourse(selectedCourseId,$('student-course-title').textContent); });
+$('btn-back-to-courses-s').addEventListener('click',()=>{ loadStudentCourses(); show('screen-student-courses'); });
+$('btn-back-to-topics-s').addEventListener('click', ()=>{ openStudentCourse(selectedCourseId,$('lbl-student-course').textContent); });
 
 </script>
 
 <style>
 :root{
-  --accent:#2563EB; --accent-dk:#1D4ED8; --accent-lt:#EFF6FF;
-  --bg:#F1F5F9; --surface:#FFFFFF; --border:#E2E8F0;
-  --text:#0F172A; --muted:#64748B;
-  --green:#15803D; --red:#DC2626;
-  --radius:14px; --radius-sm:8px;
-  --shadow:0 1px 6px rgba(0,0,0,.07); --shadow-md:0 4px 20px rgba(0,0,0,.1);
+  --ac:#2563EB;--ac-dk:#1D4ED8;--ac-lt:#EFF6FF;
+  --bg:#F1F5F9;--sf:#fff;--br:#E2E8F0;
+  --tx:#0F172A;--mu:#64748B;
+  --green:#15803D;--red:#DC2626;
+  --rd:12px;--rds:8px;
+  --sh:0 1px 6px rgba(0,0,0,.07);--shm:0 4px 20px rgba(0,0,0,.1);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
 .hidden{display:none!important;}
-.muted{color:var(--muted);font-size:.82rem;}
-.small-label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);margin-bottom:.3rem;}
-.empty-msg{color:var(--muted);text-align:center;padding:2.5rem;font-size:.93rem;}
+.muted{color:var(--mu);font-size:.82rem;}
+.small-label{display:block;font-size:.78rem;font-weight:600;color:var(--mu);margin-bottom:.28rem;}
+.empty-msg{color:var(--mu);text-align:center;padding:2.5rem;font-size:.93rem;}
 
-/* ── NAV ── */
-#app-nav{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;gap:.4rem;padding:.65rem 1.25rem;box-shadow:var(--shadow);flex-wrap:wrap;}
-.nav-logo-wrap{display:flex;align-items:center;gap:.65rem;margin-right:auto;}
-.nav-logo-img{height:34px;width:auto;display:none;border-radius:6px;object-fit:contain;}
-.nav-brand{font-family:'Sora',sans-serif;font-size:1.05rem;font-weight:800;
-  background:linear-gradient(135deg,var(--accent),#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.nav-user{font-size:.8rem;color:var(--muted);}
-.nav-role{font-size:.7rem;background:var(--accent-lt);color:var(--accent);border-radius:20px;padding:2px 8px;font-weight:600;}
-nav button{background:none;border:none;cursor:pointer;font-size:.82rem;color:var(--muted);padding:.32rem .65rem;
-  border-radius:var(--radius-sm);transition:background .15s,color .15s;font-family:'Inter',sans-serif;font-weight:500;}
-nav button:hover{background:var(--bg);color:var(--text);}
+/* NAV */
+#app-nav{position:sticky;top:0;z-index:100;background:var(--sf);border-bottom:1px solid var(--br);
+  display:flex;align-items:center;gap:.4rem;padding:.62rem 1.2rem;box-shadow:var(--sh);flex-wrap:wrap;}
+.nav-brand-wrap{display:flex;align-items:center;gap:.6rem;margin-right:auto;}
+.logo-img{height:32px;width:auto;display:none;border-radius:6px;object-fit:contain;}
+.logo-text{font-family:'Sora',sans-serif;font-size:1rem;font-weight:800;background:linear-gradient(135deg,var(--ac),#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.nav-user-wrap{font-size:.8rem;color:var(--mu);}
+.nav-role-badge{font-size:.7rem;background:var(--ac-lt);color:var(--ac);border-radius:20px;padding:2px 8px;font-weight:600;}
+nav button{background:none;border:none;cursor:pointer;font-size:.8rem;color:var(--mu);padding:.3rem .6rem;border-radius:var(--rds);transition:background .15s;font-family:'Inter',sans-serif;font-weight:500;}
+nav button:hover{background:var(--bg);color:var(--tx);}
 
-/* ── SCREENS ── */
-.screen{padding:1.75rem 1.25rem;max-width:880px;margin:0 auto;}
+/* SCREENS */
+.screen{padding:1.6rem 1.2rem;max-width:860px;margin:0 auto;}
 
-/* ── LOGIN ── */
-#screen-login{display:flex;align-items:center;justify-content:center;min-height:100vh;max-width:100%;
-  background:radial-gradient(ellipse at 70% 30%,#DBEAFE 0%,var(--bg) 60%);}
-.login-box{background:var(--surface);border-radius:20px;padding:2.25rem 2rem;width:100%;max-width:400px;box-shadow:var(--shadow-md);border:1px solid var(--border);}
-.login-logo-wrap{text-align:center;margin-bottom:1.5rem;}
-.login-logo-img{max-height:56px;max-width:200px;display:none;margin:0 auto .5rem;}
-.login-brand{font-family:'Sora',sans-serif;font-size:1.55rem;font-weight:800;
-  background:linear-gradient(135deg,var(--accent),#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.login-sub{color:var(--muted);font-size:.88rem;margin-top:.2rem;}
+/* LOGIN */
+#screen-login{display:flex;align-items:center;justify-content:center;min-height:100vh;max-width:100%;background:radial-gradient(ellipse at 70% 30%,#DBEAFE,var(--bg) 65%);}
+.login-box{background:var(--sf);border-radius:20px;padding:2.2rem 2rem;width:100%;max-width:400px;box-shadow:var(--shm);border:1px solid var(--br);}
+.login-logo{text-align:center;margin-bottom:1.5rem;}
+.login-logo .logo-img{max-height:56px;max-width:200px;margin:0 auto .5rem;display:none;}
+.login-brand{font-family:'Sora',sans-serif;font-size:1.5rem;font-weight:800;background:linear-gradient(135deg,var(--ac),#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.login-sub{color:var(--mu);font-size:.86rem;margin-top:.2rem;}
 
-/* ── FORMS ── */
-.form-group{display:flex;flex-direction:column;gap:.3rem;margin-bottom:.85rem;}
-.form-group label{font-size:.8rem;font-weight:600;color:var(--muted);}
+/* FORMS */
+.fg{display:flex;flex-direction:column;gap:.28rem;margin-bottom:.8rem;}
+.fg label{font-size:.78rem;font-weight:600;color:var(--mu);}
 input[type=text],input[type=email],input[type=password],input[type=url],input[type=number],textarea,select{
-  font-family:'Inter',sans-serif;font-size:.91rem;padding:.58rem .82rem;
-  border:1.5px solid var(--border);border-radius:var(--radius-sm);background:var(--bg);
-  color:var(--text);transition:border-color .15s;width:100%;}
-input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent);background:var(--surface);}
-textarea{min-height:78px;resize:vertical;line-height:1.55;}
+  font-family:'Inter',sans-serif;font-size:.9rem;padding:.56rem .8rem;border:1.5px solid var(--br);border-radius:var(--rds);background:var(--bg);color:var(--tx);transition:border-color .15s;width:100%;}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac);background:var(--sf);}
+textarea{min-height:76px;resize:vertical;line-height:1.55;}
 
-/* ── BUTTONS ── */
-.btn{font-family:'Inter',sans-serif;font-size:.86rem;font-weight:600;padding:.52rem 1rem;
-  border-radius:var(--radius-sm);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
-.btn-primary{background:var(--accent);color:#fff;}
-.btn-primary:hover{background:var(--accent-dk);}
-.btn-secondary{background:var(--accent-lt);color:var(--accent);}
-.btn-secondary:hover{background:#DBEAFE;}
-.btn-accent{background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0;}
-.btn-accent:hover{background:#DCFCE7;}
-.btn-ghost{background:transparent;color:var(--muted);border:1.5px solid var(--border);}
-.btn-ghost:hover{color:var(--red);border-color:var(--red);}
-.btn-wide{width:100%;padding:.68rem;font-size:.95rem;margin-top:.45rem;}
-.btn-wide-submit{width:100%;padding:.75rem;font-size:.97rem;margin-top:1.5rem;border-radius:var(--radius-sm);}
+/* BUTTONS */
+.btn{font-family:'Inter',sans-serif;font-size:.86rem;font-weight:600;padding:.52rem 1rem;border-radius:var(--rds);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn-sm{padding:.38rem .7rem;font-size:.78rem;}
+.btn-primary{background:var(--ac);color:#fff;} .btn-primary:hover{background:var(--ac-dk);}
+.btn-secondary{background:var(--ac-lt);color:var(--ac);} .btn-secondary:hover{background:#DBEAFE;}
+.btn-accent{background:#F0FDF4;color:var(--green);border:1px solid #BBF7D0;} .btn-accent:hover{background:#DCFCE7;}
+.btn-ghost{background:transparent;color:var(--mu);border:1.5px solid var(--br);} .btn-ghost:hover{color:var(--red);border-color:var(--red);}
+.btn-wide{width:100%;padding:.66rem;font-size:.95rem;margin-top:.4rem;}
+.btn-submit{width:100%;padding:.75rem;margin-top:1.5rem;}
 
-/* ── CARDS ── */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-  padding:.95rem 1.1rem;display:flex;align-items:center;gap:.9rem;margin-bottom:.6rem;
-  box-shadow:var(--shadow);transition:box-shadow .15s;}
-.card.clickable{cursor:pointer;}
-.card.clickable:hover{box-shadow:var(--shadow-md);}
+/* CARDS */
+.card{background:var(--sf);border:1px solid var(--br);border-radius:var(--rd);padding:.9rem 1.05rem;display:flex;align-items:center;gap:.85rem;margin-bottom:.55rem;box-shadow:var(--sh);transition:box-shadow .15s;}
+.card.clickable{cursor:pointer;} .card.clickable:hover{box-shadow:var(--shm);}
 .card.locked{opacity:.55;background:#F8FAFC;}
-.card-info{flex:1;min-width:0;}
-.card-info h3{font-size:.95rem;font-weight:600;margin-bottom:.18rem;}
-.card-info p{font-size:.81rem;color:var(--muted);}
-.card-actions{display:flex;gap:.4rem;flex-shrink:0;flex-wrap:wrap;}
-.card-arrow{font-size:1.2rem;color:var(--accent);}
-.topic-lock-icon{font-size:1.35rem;flex-shrink:0;}
+.card-info{flex:1;min-width:0;} .card-info h3{font-size:.93rem;font-weight:600;margin-bottom:.16rem;} .card-info p{font-size:.8rem;color:var(--mu);}
+.card-actions{display:flex;gap:.38rem;flex-shrink:0;flex-wrap:wrap;}
+.card-arrow{font-size:1.15rem;color:var(--ac);}
+.lock-icon{font-size:1.3rem;flex-shrink:0;}
 
-/* ── PAGE HEADERS ── */
-.page-header{display:flex;align-items:center;gap:.9rem;margin-bottom:1.3rem;flex-wrap:wrap;}
-.page-header h1{font-family:'Sora',sans-serif;font-size:1.4rem;font-weight:700;flex:1;}
-.back-btn{background:none;border:none;cursor:pointer;color:var(--accent);font-size:.85rem;
-  font-family:'Inter',sans-serif;font-weight:600;padding:.32rem .5rem;border-radius:var(--radius-sm);}
-.back-btn:hover{background:var(--accent-lt);}
+/* PAGE HEADERS */
+.ph{display:flex;align-items:center;gap:.85rem;margin-bottom:1.2rem;flex-wrap:wrap;}
+.ph h1{font-family:'Sora',sans-serif;font-size:1.35rem;font-weight:700;flex:1;}
+.back-btn{background:none;border:none;cursor:pointer;color:var(--ac);font-size:.84rem;font-family:'Inter',sans-serif;font-weight:600;padding:.3rem .5rem;border-radius:var(--rds);}
+.back-btn:hover{background:var(--ac-lt);}
 
-/* ── MODALS ── */
-.modal-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.45);
-  display:flex;align-items:center;justify-content:center;padding:1rem;}
-.modal-box{background:var(--surface);border-radius:16px;padding:1.65rem;width:100%;max-width:520px;
-  max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.18);}
-.modal-box h2{font-family:'Sora',sans-serif;font-size:1.2rem;margin-bottom:1rem;}
-.modal-actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem;}
+/* MODALS */
+.modal-ov{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.44);display:flex;align-items:center;justify-content:center;padding:1rem;}
+.modal-box{background:var(--sf);border-radius:16px;padding:1.6rem;width:100%;max-width:510px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.18);}
+.modal-box h2{font-family:'Sora',sans-serif;font-size:1.15rem;margin-bottom:.95rem;}
+.modal-actions{display:flex;gap:.55rem;justify-content:flex-end;margin-top:.95rem;}
 
-/* ── TOPIC EDITOR ── */
-#screen-topic-editor{max-width:880px;}
-.editor-toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1.25rem;padding:1rem;
-  background:var(--surface);border-radius:var(--radius);border:1px solid var(--border);}
-.editor-toolbar span{font-size:.8rem;font-weight:600;color:var(--muted);align-self:center;margin-right:.25rem;}
-.block-editor-item{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);
-  margin-bottom:.75rem;overflow:hidden;}
-.block-controls{display:flex;align-items:center;justify-content:space-between;
-  padding:.6rem .9rem;background:var(--bg);border-bottom:1px solid var(--border);}
-.block-type-label{font-size:.8rem;font-weight:600;color:var(--muted);}
-.block-ctrl-btns{display:flex;gap:.35rem;}
-.bctrl{background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;
-  font-size:.8rem;padding:.2rem .5rem;color:var(--muted);transition:all .15s;}
-.bctrl:hover{background:var(--bg);}
-.bctrl-del:hover{background:#FEE2E2;color:var(--red);border-color:var(--red);}
-.block-inner{padding:.9rem;}
-.block-textarea{width:100%;min-height:100px;border-radius:var(--radius-sm);}
+/* TOPIC EDITOR */
+.editor-toolbar{display:flex;gap:.45rem;flex-wrap:wrap;padding:.85rem;background:var(--sf);border-radius:var(--rd);border:1px solid var(--br);margin-bottom:1rem;}
+.editor-toolbar span{font-size:.78rem;font-weight:600;color:var(--mu);align-self:center;margin-right:.2rem;}
+.block-wrap{background:var(--sf);border:1.5px solid var(--br);border-radius:var(--rd);margin-bottom:.65rem;overflow:hidden;}
+.block-header{display:flex;align-items:center;justify-content:space-between;padding:.5rem .85rem;background:var(--bg);border-bottom:1px solid var(--br);}
+.block-type{font-size:.78rem;font-weight:600;color:var(--mu);}
+.block-btns{display:flex;gap:.3rem;}
+.bbtn{background:none;border:1px solid var(--br);border-radius:5px;cursor:pointer;font-size:.75rem;padding:.18rem .45rem;color:var(--mu);transition:all .15s;font-family:'Inter',sans-serif;}
+.bbtn:hover{background:var(--bg);}
+.bbtn-del:hover{background:#FEE2E2;color:var(--red);border-color:var(--red);}
+.block-body{padding:.85rem;}
+.block-label{display:block;font-size:.78rem;font-weight:600;color:var(--mu);margin-bottom:.3rem;}
+.block-textarea{width:100%;min-height:90px;}
 .block-textarea-sm{min-height:60px;}
-.block-input{width:100%;margin-bottom:.5rem;}
-.block-hint{font-size:.75rem;color:var(--muted);margin:.3rem 0;}
-.block-img-preview{max-width:100%;max-height:180px;border-radius:var(--radius-sm);margin-top:.6rem;object-fit:contain;}
-.file-input-small{font-size:.82rem;margin:.25rem 0;}
-.block-image-editor{}
-.editor-actions{display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border);}
+.block-input{width:100%;margin-bottom:.45rem;}
+.block-hint{font-size:.74rem;color:var(--mu);margin:.3rem 0;}
+.block-hint a{color:var(--ac);}
+.block-preview{max-width:100%;max-height:160px;border-radius:var(--rds);margin-top:.55rem;object-fit:contain;}
+.editor-footer{display:flex;gap:.65rem;justify-content:flex-end;margin-top:1.1rem;padding-top:.9rem;border-top:1px solid var(--br);}
 
-/* ── TOPIC CONTENT (STUDENT) ── */
+/* TOPIC CONTENT (STUDENT) */
 .topic-block{margin-bottom:1.5rem;}
-.topic-text{line-height:1.8;font-size:.97rem;color:var(--text);}
-.topic-img{max-width:100%;border-radius:var(--radius);display:block;cursor:pointer;box-shadow:var(--shadow);}
-.topic-img:hover{opacity:.94;}
-.img-error{background:var(--bg);border:1px dashed var(--border);border-radius:var(--radius);
-  padding:1.25rem;text-align:center;font-size:.88rem;color:var(--muted);}
-.img-link-btn{display:inline-block;margin-top:.5rem;color:var(--accent);font-weight:600;font-size:.88rem;}
+.topic-text{line-height:1.8;font-size:.96rem;}
+.topic-img{max-width:100%;border-radius:var(--rd);display:block;box-shadow:var(--sh);}
+.img-err{background:var(--bg);border:1px dashed var(--br);border-radius:var(--rd);padding:1.2rem;text-align:center;font-size:.85rem;color:var(--mu);}
+.video-wrap{border-radius:var(--rd);overflow:hidden;background:#000;aspect-ratio:16/9;width:100%;}
+.video-wrap iframe,.video-wrap video{width:100%;height:100%;display:block;}
+.video-iframe-wrap iframe{width:100%;height:360px;display:block;border:none;}
+.video-link{background:var(--bg);border:2px dashed var(--br);border-radius:var(--rd);padding:1.75rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.65rem;}
+.vl-icon{font-size:2.2rem;opacity:.35;}
+.q-block{background:var(--ac-lt);border-left:4px solid var(--ac);border-radius:0 var(--rd) var(--rd) 0;padding:.9rem 1rem;}
+.q-label{font-size:.93rem;font-weight:600;color:var(--ac);margin-bottom:.55rem;}
+.answer-ta{width:100%;min-height:78px;}
+.prev-answer{background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);padding:.6rem .82rem;font-size:.9rem;}
+.fb-received{background:#D1FAE5;border-radius:var(--rd);padding:.95rem 1.1rem;}
+.fb-received h4{margin-bottom:.4rem;color:#065F46;font-size:.93rem;}
+.fb-pending{background:#FEF3C7;border-radius:var(--rd);padding:.95rem 1.1rem;color:#92400E;font-weight:600;font-size:.88rem;}
 
-/* ── VIDEO ── */
-.video-wrap{border-radius:var(--radius);overflow:hidden;background:#000;aspect-ratio:16/9;width:100%;}
-.video-wrap iframe{width:100%;height:100%;display:block;}
-.video-wrap video{width:100%;height:100%;display:block;}
-.video-link-block{background:var(--bg);border:2px dashed var(--border);border-radius:var(--radius);
-  padding:2rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.75rem;}
-.video-link-icon{font-size:2.5rem;opacity:.35;}
-
-/* ── QUESTIONS ── */
-.question-block{background:var(--accent-lt);border-left:4px solid var(--accent);
-  border-radius:0 var(--radius) var(--radius) 0;padding:1rem 1.1rem;}
-.question-text-display{font-size:.95rem;font-weight:600;color:var(--accent);margin-bottom:.6rem;}
-.answer-textarea{width:100%;min-height:80px;border-radius:var(--radius-sm);}
-.prev-answer-box{background:var(--surface);border-radius:var(--radius-sm);padding:.65rem .85rem;
-  font-size:.92rem;color:var(--text);border:1px solid var(--border);}
-
-/* ── ANSWERS (TEACHER) ── */
+/* ANSWERS (TEACHER) */
 .answer-card{flex-direction:column;align-items:stretch;}
-.answer-header{display:flex;align-items:flex-start;justify-content:space-between;gap:.75rem;margin-bottom:.85rem;flex-wrap:wrap;}
-.status-badge{font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;}
-.status-pending{background:#FEF3C7;color:#92400E;}
-.status-checked{background:#D1FAE5;color:#065F46;}
-.qa-block{background:var(--bg);border-radius:var(--radius-sm);padding:.6rem .85rem;margin-bottom:.4rem;}
-.question-text{font-size:.78rem;color:var(--muted);margin-bottom:.2rem;}
-.answer-text{font-size:.9rem;}
-.answer-feedback-row{display:flex;gap:.7rem;align-items:flex-end;flex-wrap:wrap;margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border);}
-.feedback-left{flex:0 0 120px;}
-.feedback-right{flex:1;min-width:150px;}
-.feedback-input{min-height:56px;}
-.feedback-btn{flex-shrink:0;align-self:flex-end;}
-.grade-select{padding:.48rem .65rem;}
+.answer-header{display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;margin-bottom:.8rem;flex-wrap:wrap;}
+.status-badge{font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
+.status-pending{background:#FEF3C7;color:#92400E;} .status-checked{background:#D1FAE5;color:#065F46;}
+.answer-qs{margin-bottom:.75rem;}
+.qa-block{background:var(--bg);border-radius:var(--rds);padding:.55rem .8rem;margin-bottom:.38rem;}
+.q-text{font-size:.77rem;color:var(--mu);margin-bottom:.18rem;} .a-text{font-size:.88rem;}
+.feedback-row{display:flex;gap:.65rem;align-items:flex-end;flex-wrap:wrap;padding-top:.7rem;border-top:1px solid var(--br);}
+.fb-left{flex:0 0 115px;} .fb-right{flex:1;min-width:140px;}
+.fb-input{min-height:52px;} .fb-btn{flex-shrink:0;align-self:flex-end;}
+.grade-select{padding:.45rem .6rem;}
 
-/* ── GRADES ── */
-.grade-badge{display:inline-block;font-size:.8rem;font-weight:700;padding:2px 9px;border-radius:20px;margin-left:.35rem;}
+/* GRADES */
+.grade-badge{display:inline-block;font-size:.78rem;font-weight:700;padding:2px 9px;border-radius:20px;margin-left:.35rem;}
 .grade-big{font-size:1.05rem;padding:4px 13px;}
-.gc-green  {background:#D1FAE5;color:#065F46;}
-.gc-blue   {background:#DBEAFE;color:#1E40AF;}
-.gc-orange {background:#FEF3C7;color:#92400E;}
-.gc-red    {background:#FEE2E2;color:#991B1B;}
-.gc-darkred{background:#450a0a;color:#fca5a5;}
-.gc-gray   {background:#F3F4F6;color:#374151;}
-.grade-student-section{margin-bottom:1.4rem;}
-.grade-student-name{font-size:.97rem;font-weight:700;color:var(--accent);margin-bottom:.5rem;}
-.grade-row{display:flex;align-items:center;gap:.75rem;padding:.5rem .7rem;
-  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:.3rem;}
+.gc-green{background:#D1FAE5;color:#065F46;} .gc-blue{background:#DBEAFE;color:#1E40AF;}
+.gc-orange{background:#FEF3C7;color:#92400E;} .gc-red{background:#FEE2E2;color:#991B1B;}
+.gc-darkred{background:#450a0a;color:#fca5a5;} .gc-gray{background:#F3F4F6;color:#374151;}
+.grade-section{margin-bottom:1.3rem;}
+.grade-name{font-size:.95rem;font-weight:700;color:var(--ac);margin-bottom:.45rem;}
+.grade-row{display:flex;align-items:center;gap:.7rem;padding:.48rem .7rem;background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);margin-bottom:.3rem;}
 .grade-topic{flex:1;font-size:.88rem;font-weight:500;}
-.grade-feedback-text{font-size:.81rem;color:var(--muted);margin-top:.3rem;}
+.grade-fb{font-size:.8rem;color:var(--mu);margin-top:.3rem;}
 
-/* ── FEEDBACK ── */
-.feedback-received{background:#D1FAE5;border-radius:var(--radius);padding:1rem 1.15rem;}
-.feedback-received h4{margin-bottom:.45rem;color:#065F46;font-size:.95rem;}
-.feedback-pending{background:#FEF3C7;border-radius:var(--radius);padding:1rem 1.15rem;color:#92400E;font-weight:600;font-size:.9rem;}
+/* ROLES / ACCESS */
+.role-badge{font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:20px;display:inline-block;}
+.role-admin{background:#EDE9FE;color:#5B21B6;} .role-teacher{background:#D1FAE5;color:#065F46;} .role-student{background:var(--ac-lt);color:var(--ac);}
+.access-row{padding:.55rem 0;border-bottom:1px solid var(--br);}
+.access-label{display:flex;align-items:center;gap:.55rem;cursor:pointer;}
+.access-label input{width:auto;flex-shrink:0;} .access-label span{font-weight:600;font-size:.88rem;}
+.access-label small{color:var(--mu);font-size:.77rem;margin-left:auto;}
 
-/* ── ROLES ── */
-.role-badge{font-size:.72rem;font-weight:700;padding:2px 7px;border-radius:20px;display:inline-block;}
-.role-admin{background:#EDE9FE;color:#5B21B6;}
-.role-teacher{background:#D1FAE5;color:#065F46;}
-.role-student{background:var(--accent-lt);color:var(--accent);}
+/* SEARCH */
+.search-wrap{margin-bottom:.95rem;}
 
-/* ── ACCESS ── */
-.access-row{padding:.6rem 0;border-bottom:1px solid var(--border);}
-.access-label{display:flex;align-items:center;gap:.6rem;cursor:pointer;}
-.access-label input{width:auto;flex-shrink:0;}
-.access-label span{font-weight:600;font-size:.9rem;}
-.access-label small{color:var(--muted);font-size:.78rem;margin-left:auto;}
-
-/* ── SETTINGS ── */
-.settings-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.35rem;margin-bottom:1rem;}
-.settings-section h3{font-size:.95rem;font-weight:700;margin-bottom:.75rem;}
-.logo-preview-wrap{display:flex;align-items:center;gap:1rem;margin-bottom:1rem;}
-.logo-preview-img{max-height:60px;max-width:180px;border-radius:8px;border:1px solid var(--border);display:none;object-fit:contain;}
-
-/* ── TOASTS ── */
-.toast{position:fixed;bottom:1.2rem;right:1.2rem;z-index:999;background:var(--text);color:#fff;
-  padding:.62rem 1.05rem;border-radius:var(--radius-sm);font-size:.86rem;font-weight:500;
-  box-shadow:var(--shadow-md);animation:slideIn .2s ease;}
+/* TOAST */
+.toast{position:fixed;bottom:1.2rem;right:1.2rem;z-index:999;background:var(--tx);color:#fff;padding:.6rem 1rem;border-radius:var(--rds);font-size:.84rem;font-weight:500;box-shadow:var(--shm);animation:si .2s ease;}
 .toast-success{background:#15803D;} .toast-error{background:var(--red);}
-@keyframes slideIn{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+@keyframes si{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
 
-.search-wrap{margin-bottom:1rem;}
-
-@media(max-width:620px){
+@media(max-width:600px){
   .card{flex-wrap:wrap;} .card-actions{width:100%;}
-  .answer-feedback-row{flex-direction:column;}
-  .feedback-left,.feedback-right{flex:1 1 100%;}
-  .editor-toolbar{gap:.4rem;}
+  .feedback-row{flex-direction:column;}
+  .fb-left,.fb-right{flex:1 1 100%;}
 }
 </style>
 </head>
 <body>
 
-<!-- ══ НАВИГАЦИЯ ══════════════════════════════════════════════ -->
+<!-- ═══ НАВИГАЦИЯ ══════════════════════════════════════════════ -->
 <nav id="app-nav" class="hidden">
-  <div class="nav-logo-wrap">
-    <img class="nav-logo-img site-logo-img" src="" alt="logo"/>
-    <span class="nav-brand site-logo-text">Study Case Portal</span>
+  <div class="nav-brand-wrap">
+    <img class="logo-img" src="" alt="logo"/>
+    <span class="logo-text">Study Case Portal</span>
   </div>
-
   <!-- Администратор -->
-  <button id="nav-courses-admin"  class="hidden">Курсы</button>
-  <button id="nav-users"          class="hidden">Пользователи</button>
-  <button id="nav-answers-admin"  class="hidden">Ответы</button>
-  <button id="nav-grades-admin"   class="hidden">Журнал оценок</button>
-  <button id="nav-settings-admin" class="hidden">⚙ Настройки</button>
-
+  <button id="nav-courses-a" class="hidden">Курсы</button>
+  <button id="nav-users-a"   class="hidden">Пользователи</button>
+  <button id="nav-answers-a" class="hidden">Ответы</button>
+  <button id="nav-grades-a"  class="hidden">Журнал оценок</button>
   <!-- Преподаватель -->
-  <button id="nav-answers-teacher" class="hidden">Ответы студентов</button>
-  <button id="nav-grades-teacher"  class="hidden">Журнал оценок</button>
-
+  <button id="nav-answers-t" class="hidden">Ответы студентов</button>
+  <button id="nav-grades-t"  class="hidden">Журнал оценок</button>
   <!-- Студент -->
-  <button id="nav-my-courses" class="hidden">Мои курсы</button>
-  <button id="nav-my-grades"  class="hidden">Мои оценки</button>
-
-  <span class="nav-user">
-    <span id="nav-username"></span>&nbsp;·&nbsp;
-    <span class="nav-role" id="nav-role"></span>
+  <button id="nav-courses-s" class="hidden">Мои курсы</button>
+  <button id="nav-grades-s"  class="hidden">Мои оценки</button>
+  <span class="nav-user-wrap">
+    <span id="nav-username"></span>&nbsp;·&nbsp;<span class="nav-role-badge" id="nav-role-badge"></span>
   </span>
   <button id="btn-logout">Выйти</button>
 </nav>
 
-<!-- ══ ЛОГИН ═════════════════════════════════════════════════ -->
+<!-- ═══ ЛОГИН ══════════════════════════════════════════════════ -->
 <div id="screen-login" class="screen">
   <div class="login-box">
-    <div class="login-logo-wrap">
-      <img class="login-logo-img site-logo-img" src="" alt="logo"/>
-      <div class="login-brand site-logo-text">Study Case Portal</div>
+    <div class="login-logo">
+      <img class="logo-img" src="" alt="logo"/>
+      <div class="login-brand logo-text">Study Case Portal</div>
       <p class="login-sub">Войди в свой аккаунт</p>
     </div>
-    <div class="form-group"><label>Email</label><input type="email" id="login-email" placeholder="example@mail.ru"/></div>
-    <div class="form-group"><label>Пароль</label><input type="password" id="login-pass" placeholder="••••••••"/></div>
+    <div class="fg"><label>Email</label><input type="email" id="login-email" placeholder="example@mail.ru"/></div>
+    <div class="fg"><label>Пароль</label><input type="password" id="login-pass" placeholder="••••••••"/></div>
     <button class="btn btn-primary btn-wide" id="btn-login">Войти</button>
   </div>
 </div>
 
-<!-- ══ НАСТРОЙКИ ══════════════════════════════════════════════ -->
-<div id="screen-settings" class="screen hidden">
-  <div class="page-header"><h1>⚙ Настройки портала</h1></div>
-  <div class="settings-section">
-    <h3>Логотип компании</h3>
-    <div class="logo-preview-wrap">
-      <img class="logo-preview-img site-logo-img" src="" alt="Логотип"/>
-      <span class="muted site-logo-text">Логотип не загружен</span>
-    </div>
-    <p class="muted" style="margin-bottom:.75rem;font-size:.83rem">Логотип отображается в шапке и на странице входа. Рекомендуется PNG с прозрачным фоном.</p>
-    <input type="file" id="logo-file-input" accept="image/*" style="display:none"/>
-    <button class="btn btn-primary" id="btn-save-logo">Загрузить логотип</button>
-  </div>
-  <div class="settings-section">
-    <h3>Правила безопасности Firebase</h3>
-    <p class="muted" style="font-size:.83rem">Для загрузки картинок и логотипа нужно включить Firebase Storage.<br/>
-    Перейди в Firebase → Storage → Get started → выбери регион → Rules → вставь:</p>
-    <pre style="background:var(--bg);padding:.9rem;border-radius:8px;font-size:.75rem;margin-top:.75rem;overflow-x:auto;border:1px solid var(--border)">rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    match /{allPaths=**} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null;
-    }
-  }
-}</pre>
-  </div>
-</div>
-
-<!-- ══ АДМИН: КУРСЫ ═══════════════════════════════════════════ -->
+<!-- ═══ АДМИН: КУРСЫ ════════════════════════════════════════════ -->
 <div id="screen-admin-courses" class="screen hidden">
-  <div class="page-header">
-    <h1>Курсы</h1>
-    <button class="btn btn-primary" id="btn-create-course">+ Новый курс</button>
-  </div>
+  <div class="ph"><h1>Курсы</h1><button class="btn btn-primary" id="btn-create-course">+ Новый курс</button></div>
   <div id="admin-courses-list"></div>
 </div>
 
-<!-- ══ АДМИН: ТЕМЫ ════════════════════════════════════════════ -->
+<!-- ═══ АДМИН: ТЕМЫ ════════════════════════════════════════════ -->
 <div id="screen-admin-topics" class="screen hidden">
-  <div class="page-header">
+  <div class="ph">
     <button class="back-btn" id="btn-back-to-courses">← Назад</button>
-    <h1 id="admin-topics-course-title"></h1>
-    <button class="btn btn-primary" id="btn-create-topic">+ Новая тема</button>
+    <h1 id="lbl-admin-course-title"></h1>
+    <button class="btn btn-primary" id="btn-new-topic">+ Новая тема</button>
   </div>
   <div id="admin-topics-list"></div>
 </div>
 
-<!-- ══ РЕДАКТОР ТЕМЫ ══════════════════════════════════════════ -->
+<!-- ═══ РЕДАКТОР ТЕМЫ ══════════════════════════════════════════ -->
 <div id="screen-topic-editor" class="screen hidden">
-  <div class="page-header">
-    <button class="back-btn" id="btn-topic-editor-back">← Назад к темам</button>
-    <h1 id="topic-editor-title">Тема</h1>
+  <div class="ph">
+    <button class="back-btn" id="btn-editor-back">← К темам</button>
+    <h1 id="lbl-editor-title">Тема</h1>
   </div>
-
-  <!-- Заголовок и порядок -->
-  <div style="display:flex;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;">
-    <div class="form-group" style="flex:1;min-width:200px;margin:0">
-      <label>Название темы</label>
-      <input type="text" id="topic-title-inp" placeholder="Например: Тема 1 — Введение"/>
-    </div>
-    <div class="form-group" style="width:120px;margin:0">
-      <label>Порядок</label>
-      <input type="number" id="topic-order-inp" value="0" min="0"/>
-    </div>
+  <div style="display:flex;gap:.9rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <div class="fg" style="flex:1;min-width:180px;margin:0"><label>Название темы</label><input type="text" id="inp-topic-title" placeholder="Тема 1 — Введение"/></div>
+    <div class="fg" style="width:110px;margin:0"><label>Порядок</label><input type="number" id="inp-topic-order" value="0" min="0"/></div>
   </div>
-
-  <!-- Добавить блок -->
   <div class="editor-toolbar">
     <span>Добавить блок:</span>
-    <button class="btn btn-secondary" id="btn-add-text">📝 Текст</button>
-    <button class="btn btn-secondary" id="btn-add-image">🖼 Картинка</button>
-    <button class="btn btn-secondary" id="btn-add-video">▶ Видео</button>
-    <button class="btn btn-secondary" id="btn-add-question">❓ Вопрос</button>
+    <button class="btn btn-sm btn-secondary" id="btn-add-text">📝 Текст</button>
+    <button class="btn btn-sm btn-secondary" id="btn-add-image">🖼 Картинка</button>
+    <button class="btn btn-sm btn-secondary" id="btn-add-video">▶ Видео</button>
+    <button class="btn btn-sm btn-secondary" id="btn-add-question">❓ Вопрос</button>
   </div>
-
-  <!-- Блоки -->
   <div id="blocks-container"></div>
-
-  <div class="editor-actions">
-    <button class="btn btn-ghost" id="btn-topic-editor-back2" onclick="document.getElementById('btn-topic-editor-back').click()">Отмена</button>
-    <button class="btn btn-primary" id="btn-topic-editor-save">💾 Сохранить тему</button>
+  <div class="editor-footer">
+    <button class="btn btn-ghost" id="btn-editor-cancel" onclick="document.getElementById('btn-editor-back').click()">Отмена</button>
+    <button class="btn btn-primary" id="btn-editor-save">💾 Сохранить тему</button>
   </div>
 </div>
 
-<!-- ══ ПОЛЬЗОВАТЕЛИ ═══════════════════════════════════════════ -->
+<!-- ═══ ПОЛЬЗОВАТЕЛИ ═══════════════════════════════════════════ -->
 <div id="screen-admin-users" class="screen hidden">
-  <div class="page-header">
-    <h1>Пользователи</h1>
-    <button class="btn btn-primary" id="btn-create-user">+ Создать</button>
-  </div>
+  <div class="ph"><h1>Пользователи</h1><button class="btn btn-primary" id="btn-create-user">+ Создать</button></div>
   <div id="admin-users-list"></div>
 </div>
 
-<!-- ══ ОТВЕТЫ ════════════════════════════════════════════════ -->
+<!-- ═══ ОТВЕТЫ (УЧИТЕЛЬ) ══════════════════════════════════════ -->
 <div id="screen-teacher" class="screen hidden">
-  <div class="page-header"><h1>Ответы студентов</h1></div>
-  <div class="search-wrap"><input type="text" id="answers-search" placeholder="🔍 Поиск..."/></div>
+  <div class="ph"><h1>Ответы студентов</h1></div>
+  <div class="search-wrap"><input type="text" id="answers-search" placeholder="🔍 Поиск по имени или теме..."/></div>
   <div id="teacher-answers-list"></div>
 </div>
 
-<!-- ══ ЖУРНАЛ ОЦЕНОК ═════════════════════════════════════════ -->
+<!-- ═══ ЖУРНАЛ ОЦЕНОК ══════════════════════════════════════════ -->
 <div id="screen-grades" class="screen hidden">
-  <div class="page-header"><h1>Журнал оценок</h1></div>
+  <div class="ph"><h1>Журнал оценок</h1></div>
   <div id="grades-list"></div>
 </div>
 
-<!-- ══ МОИ ОЦЕНКИ (СТУДЕНТ) ══════════════════════════════════ -->
+<!-- ═══ МОИ ОЦЕНКИ (СТУДЕНТ) ══════════════════════════════════ -->
 <div id="screen-my-grades" class="screen hidden">
-  <div class="page-header"><h1>Мои оценки</h1></div>
+  <div class="ph"><h1>Мои оценки</h1></div>
   <div id="my-grades-list"></div>
 </div>
 
-<!-- ══ СТУДЕНТ: КУРСЫ ════════════════════════════════════════ -->
+<!-- ═══ СТУДЕНТ: КУРСЫ ══════════════════════════════════════════ -->
 <div id="screen-student-courses" class="screen hidden">
-  <div class="page-header"><h1>Мои курсы</h1></div>
+  <div class="ph"><h1>Мои курсы</h1></div>
   <div id="student-courses-list"></div>
 </div>
 
-<!-- ══ СТУДЕНТ: ТЕМЫ ════════════════════════════════════════ -->
+<!-- ═══ СТУДЕНТ: ТЕМЫ ═══════════════════════════════════════════ -->
 <div id="screen-student-topics" class="screen hidden">
-  <div class="page-header">
-    <button class="back-btn" id="btn-back-to-student-courses">← К курсам</button>
-    <h1 id="student-course-title"></h1>
+  <div class="ph">
+    <button class="back-btn" id="btn-back-to-courses-s">← К курсам</button>
+    <h1 id="lbl-student-course"></h1>
   </div>
   <div id="student-topics-list"></div>
 </div>
 
-<!-- ══ СТУДЕНТ: ТЕМА ════════════════════════════════════════ -->
+<!-- ═══ СТУДЕНТ: ТЕМА ═══════════════════════════════════════════ -->
 <div id="screen-student-topic" class="screen hidden">
-  <div class="page-header">
-    <button class="back-btn" id="btn-back-to-student-topics">← К темам</button>
-    <h1 id="student-topic-title"></h1>
+  <div class="ph">
+    <button class="back-btn" id="btn-back-to-topics-s">← К темам</button>
+    <h1 id="lbl-student-topic"></h1>
   </div>
-  <div id="topic-content-container"></div>
-  <div id="topic-submit-area"></div>
+  <div id="topic-blocks"></div>
+  <div id="topic-status"></div>
 </div>
 
-<!-- ══ МОДАЛКА: НОВЫЙ КУРС ════════════════════════════════════ -->
-<div id="modal-course" class="modal-overlay hidden">
+<!-- ═══ МОДАЛКА: КУРС ══════════════════════════════════════════ -->
+<div id="modal-course" class="modal-ov hidden">
   <div class="modal-box">
     <h2>Новый курс</h2>
-    <div class="form-group"><label>Название</label><input type="text" id="course-title-input" placeholder="Математика 10 класс"/></div>
-    <div class="form-group"><label>Описание</label><textarea id="course-desc-input" placeholder="Краткое описание..."></textarea></div>
+    <div class="fg"><label>Название</label><input type="text" id="inp-course-title" placeholder="Математика 10 класс"/></div>
+    <div class="fg"><label>Описание</label><textarea id="inp-course-desc" placeholder="Краткое описание..."></textarea></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btn-course-cancel">Отмена</button>
       <button class="btn btn-primary" id="btn-course-save">Создать</button>
@@ -1117,43 +967,43 @@ service firebase.storage {
   </div>
 </div>
 
-<!-- ══ МОДАЛКА: ДОСТУП К КУРСУ ════════════════════════════════ -->
-<div id="modal-course-access" class="modal-overlay hidden">
+<!-- ═══ МОДАЛКА: ДОСТУП К КУРСУ ═══════════════════════════════ -->
+<div id="modal-course-access" class="modal-ov hidden">
   <div class="modal-box">
     <h2>Студенты на курсе</h2>
-    <p class="muted" style="margin-bottom:.9rem">Курс: <strong id="course-access-title"></strong></p>
-    <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">Отмеченные студенты видят курс и его темы:</p>
+    <p class="muted" style="margin-bottom:.8rem">Курс: <strong id="lbl-course-access-title"></strong></p>
+    <p style="font-size:.8rem;color:var(--mu);margin-bottom:.7rem">Отмеченные студенты видят этот курс:</p>
     <div id="course-access-list"></div>
-    <div class="modal-actions" style="margin-top:1.1rem">
+    <div class="modal-actions" style="margin-top:1rem">
       <button class="btn btn-ghost" id="btn-course-access-cancel">Отмена</button>
       <button class="btn btn-primary" id="btn-course-access-save">Сохранить</button>
     </div>
   </div>
 </div>
 
-<!-- ══ МОДАЛКА: ДОСТУП К ТЕМЕ ═════════════════════════════════ -->
-<div id="modal-access" class="modal-overlay hidden">
+<!-- ═══ МОДАЛКА: ДОСТУП К ТЕМЕ ════════════════════════════════ -->
+<div id="modal-topic-access" class="modal-ov hidden">
   <div class="modal-box">
     <h2>Доступ к теме</h2>
-    <p class="muted" style="margin-bottom:.85rem">Тема: <strong id="access-topic-name"></strong></p>
-    <div id="access-students-list"></div>
-    <div class="modal-actions" style="margin-top:1.1rem">
-      <button class="btn btn-ghost" id="btn-access-cancel">Отмена</button>
-      <button class="btn btn-primary" id="btn-access-save">Сохранить</button>
+    <p class="muted" style="margin-bottom:.8rem">Тема: <strong id="lbl-access-topic-name"></strong></p>
+    <p style="font-size:.8rem;color:var(--mu);margin-bottom:.7rem">Отмеченные студенты могут открыть эту тему:</p>
+    <div id="topic-access-list"></div>
+    <div class="modal-actions" style="margin-top:1rem">
+      <button class="btn btn-ghost" id="btn-topic-access-cancel">Отмена</button>
+      <button class="btn btn-primary" id="btn-topic-access-save">Сохранить</button>
     </div>
   </div>
 </div>
 
-<!-- ══ МОДАЛКА: ПОЛЬЗОВАТЕЛЬ ══════════════════════════════════ -->
-<div id="modal-user" class="modal-overlay hidden">
+<!-- ═══ МОДАЛКА: ПОЛЬЗОВАТЕЛЬ ══════════════════════════════════ -->
+<div id="modal-user" class="modal-ov hidden">
   <div class="modal-box">
     <h2>Новый пользователь</h2>
-    <div class="form-group"><label>Имя</label><input type="text" id="user-name-input" placeholder="Иванов Иван"/></div>
-    <div class="form-group"><label>Email</label><input type="email" id="user-email-input" placeholder="ivan@school.ru"/></div>
-    <div class="form-group"><label>Пароль</label><input type="password" id="user-pass-input" placeholder="мин. 6 символов"/></div>
-    <div class="form-group">
-      <label>Роль</label>
-      <select id="user-role-select">
+    <div class="fg"><label>Имя</label><input type="text" id="inp-user-name" placeholder="Иванов Иван"/></div>
+    <div class="fg"><label>Email</label><input type="email" id="inp-user-email" placeholder="ivan@school.ru"/></div>
+    <div class="fg"><label>Пароль</label><input type="password" id="inp-user-pass" placeholder="мин. 6 символов"/></div>
+    <div class="fg"><label>Роль</label>
+      <select id="sel-user-role">
         <option value="student">Студент</option>
         <option value="teacher">Преподаватель</option>
         <option value="admin">Администратор</option>

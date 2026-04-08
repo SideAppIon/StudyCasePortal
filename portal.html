@@ -10,89 +10,179 @@
   --ac:#2563EB;--ac-dk:#1D4ED8;--ac-lt:#EFF6FF;
   --bg:#F1F5F9;--sf:#fff;--br:#E2E8F0;
   --tx:#0F172A;--mu:#64748B;--green:#15803D;--red:#DC2626;
-  --rd:12px;--rds:8px;
-  --sh:0 1px 6px rgba(0,0,0,.07);--shm:0 4px 20px rgba(0,0,0,.1);
+  --rd:14px;--rds:9px;
+  --sh:0 1px 6px rgba(0,0,0,.07);--shm:0 6px 24px rgba(0,0,0,.12);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;}
+html{scroll-behavior:smooth;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;overflow-x:hidden;}
 .hidden{display:none!important;}
 .muted{color:var(--mu);font-size:.82rem;}
-.slabel{display:block;font-size:.78rem;font-weight:600;color:var(--mu);margin-bottom:.28rem;}
-.empty-msg{color:var(--mu);text-align:center;padding:2.5rem;font-size:.93rem;}
+.slbl{display:block;font-size:.78rem;font-weight:600;color:var(--mu);margin-bottom:.3rem;}
+.empty{color:var(--mu);text-align:center;padding:2.5rem;font-size:.93rem;}
 
-#app-nav{position:sticky;top:0;z-index:100;background:var(--sf);border-bottom:1px solid var(--br);
-  display:flex;align-items:center;gap:.4rem;padding:.62rem 1.2rem;box-shadow:var(--sh);flex-wrap:wrap;}
-.nav-brand{display:flex;align-items:center;gap:.6rem;margin-right:auto;}
-.logo-img{height:32px;width:auto;display:none;border-radius:6px;object-fit:contain;}
-.logo-text{font-family:'Sora',sans-serif;font-size:1rem;font-weight:800;
-  background:linear-gradient(135deg,var(--ac),#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.nav-user{font-size:.8rem;color:var(--mu);}
-.nav-rbadge{font-size:.7rem;background:var(--ac-lt);color:var(--ac);border-radius:20px;padding:2px 8px;font-weight:600;}
-nav .nbtn{background:none;border:none;cursor:pointer;font-size:.8rem;color:var(--mu);padding:.3rem .6rem;
-  border-radius:var(--rds);transition:background .15s;font-family:'Inter',sans-serif;font-weight:500;}
-nav .nbtn:hover{background:var(--bg);color:var(--tx);}
+/* ── ANIMATIONS ─────────────────────────────────────────── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes slideRight{from{opacity:0;transform:translateX(-22px)}to{opacity:1;transform:none}}
+@keyframes pop{0%{transform:scale(.85);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
 
-.screen{padding:1.6rem 1.2rem;max-width:860px;margin:0 auto;}
-#screen-login{display:flex;align-items:center;justify-content:center;min-height:100vh;max-width:100%;
-  background:radial-gradient(ellipse at 70% 30%,#DBEAFE,var(--bg) 65%);}
-.lbox{background:var(--sf);border-radius:20px;padding:2.2rem 2rem;width:100%;max-width:400px;
-  box-shadow:var(--shm);border:1px solid var(--br);}
-.llogo{text-align:center;margin-bottom:1.5rem;}
-.llogo .logo-img{max-height:56px;max-width:200px;margin:0 auto .5rem;display:none;}
-.lbrand{font-family:'Sora',sans-serif;font-size:1.5rem;font-weight:800;
-  background:linear-gradient(135deg,var(--ac),#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
-.lsub{color:var(--mu);font-size:.86rem;margin-top:.2rem;}
+.anim-fade-up  {animation:fadeUp .35s ease both}
+.anim-fade-in  {animation:fadeIn .25s ease both}
+.anim-slide-r  {animation:slideRight .3s ease both}
+.anim-pop      {animation:pop .35s cubic-bezier(.34,1.56,.64,1) both}
+.anim-delay-1  {animation-delay:.07s}
+.anim-delay-2  {animation-delay:.14s}
+.anim-delay-3  {animation-delay:.21s}
+.anim-delay-4  {animation-delay:.28s}
+.anim-delay-5  {animation-delay:.35s}
 
-.fg{display:flex;flex-direction:column;gap:.28rem;margin-bottom:.8rem;}
+/* стаггер для списков */
+#list-ac .card:nth-child(1),#list-at .card:nth-child(1),
+#list-au .card:nth-child(1),#list-sc .card:nth-child(1),
+#list-st .card:nth-child(1){animation-delay:.04s}
+#list-ac .card:nth-child(2),#list-at .card:nth-child(2),
+#list-au .card:nth-child(2),#list-sc .card:nth-child(2),
+#list-st .card:nth-child(2){animation-delay:.09s}
+#list-ac .card:nth-child(3),#list-at .card:nth-child(3),
+#list-au .card:nth-child(3),#list-sc .card:nth-child(3),
+#list-st .card:nth-child(3){animation-delay:.14s}
+#list-ac .card:nth-child(n+4),#list-at .card:nth-child(n+4),
+#list-au .card:nth-child(n+4),#list-sc .card:nth-child(n+4),
+#list-st .card:nth-child(n+4){animation-delay:.19s}
+
+/* ── NAV ───────────────────────────────────────────────── */
+#app-nav{position:sticky;top:0;z-index:100;background:var(--sf);
+  border-bottom:1px solid var(--br);display:flex;align-items:center;gap:.35rem;
+  padding:.6rem 1.2rem;box-shadow:0 2px 12px rgba(37,99,235,.08);flex-wrap:wrap;
+  transition:box-shadow .3s;}
+#app-nav.scrolled{box-shadow:0 4px 20px rgba(37,99,235,.15);}
+.nav-brand{display:flex;align-items:center;gap:.65rem;margin-right:auto;}
+.logo-img{height:34px;width:auto;display:none;border-radius:6px;object-fit:contain;}
+.logo-text{font-family:'Sora',sans-serif;font-size:1.05rem;font-weight:800;
+  background:linear-gradient(135deg,var(--ac),#7C3AED);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.nav-user{font-size:.79rem;color:var(--mu);}
+.nav-rb{font-size:.69rem;background:var(--ac-lt);color:var(--ac);
+  border-radius:20px;padding:2px 9px;font-weight:600;
+  transition:background .2s;}
+.nbtn{background:none;border:none;cursor:pointer;font-size:.8rem;color:var(--mu);
+  padding:.3rem .6rem;border-radius:var(--rds);transition:background .15s,color .15s,transform .1s;
+  font-family:'Inter',sans-serif;font-weight:500;position:relative;}
+.nbtn::after{content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:0;height:2px;background:var(--ac);border-radius:2px;transition:width .2s;}
+.nbtn:hover{background:var(--bg);color:var(--tx);}
+.nbtn:hover::after{width:70%;}
+.nbtn:active{transform:scale(.95);}
+
+/* ── SCREENS ─────────────────────────────────────────────── */
+.screen{padding:1.7rem 1.2rem;max-width:880px;margin:0 auto;}
+
+/* ── LOGIN ─────────────────────────────────────────────── */
+#screen-login{display:flex;align-items:center;justify-content:center;
+  min-height:100vh;max-width:100%;
+  background:radial-gradient(ellipse at 65% 35%,#DBEAFE 0%,var(--bg) 60%),
+             radial-gradient(ellipse at 20% 80%,#EDE9FE 0%,transparent 50%);}
+.lbox{background:var(--sf);border-radius:22px;padding:2.4rem 2rem;
+  width:100%;max-width:400px;box-shadow:var(--shm);border:1px solid var(--br);
+  animation:pop .5s cubic-bezier(.34,1.56,.64,1);}
+.llogo{text-align:center;margin-bottom:1.6rem;}
+.llogo .logo-img{max-height:58px;max-width:200px;margin:0 auto .5rem;display:none;}
+.lbrand{font-family:'Sora',sans-serif;font-size:1.55rem;font-weight:800;
+  background:linear-gradient(135deg,var(--ac),#7C3AED);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.lsub{color:var(--mu);font-size:.85rem;margin-top:.25rem;}
+
+/* ── FORMS ──────────────────────────────────────────────── */
+.fg{display:flex;flex-direction:column;gap:.28rem;margin-bottom:.82rem;}
 .fg label{font-size:.78rem;font-weight:600;color:var(--mu);}
-input[type=text],input[type=email],input[type=password],input[type=url],input[type=number],textarea,select{
-  font-family:'Inter',sans-serif;font-size:.9rem;padding:.56rem .8rem;border:1.5px solid var(--br);
-  border-radius:var(--rds);background:var(--bg);color:var(--tx);transition:border-color .15s;width:100%;}
-input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac);background:var(--sf);}
+input[type=text],input[type=email],input[type=password],input[type=url],
+input[type=number],textarea,select{
+  font-family:'Inter',sans-serif;font-size:.9rem;padding:.58rem .82rem;
+  border:1.5px solid var(--br);border-radius:var(--rds);background:var(--bg);
+  color:var(--tx);transition:border-color .2s,box-shadow .2s,background .2s;width:100%;}
+input:focus,textarea:focus,select:focus{
+  outline:none;border-color:var(--ac);background:var(--sf);
+  box-shadow:0 0 0 3px rgba(37,99,235,.1);}
 textarea{min-height:76px;resize:vertical;line-height:1.55;}
 
+/* ── BUTTONS ─────────────────────────────────────────────── */
 .btn{font-family:'Inter',sans-serif;font-size:.86rem;font-weight:600;padding:.52rem 1rem;
-  border-radius:var(--rds);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
+  border-radius:var(--rds);border:none;cursor:pointer;
+  transition:all .18s;white-space:nowrap;position:relative;overflow:hidden;}
+.btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,0);transition:background .15s;}
+.btn:hover::after{background:rgba(255,255,255,.12);}
+.btn:active{transform:scale(.96);}
 .btn-sm{padding:.36rem .65rem;font-size:.76rem;}
-.bp{background:var(--ac);color:#fff;}.bp:hover{background:var(--ac-dk);}
+.bp{background:var(--ac);color:#fff;box-shadow:0 2px 8px rgba(37,99,235,.3);}
+.bp:hover{background:var(--ac-dk);box-shadow:0 4px 14px rgba(37,99,235,.4);}
 .bs{background:var(--ac-lt);color:var(--ac);}.bs:hover{background:#DBEAFE;}
 .ba{background:#F0FDF4;color:var(--green);border:1px solid #BBF7D0;}.ba:hover{background:#DCFCE7;}
-.bg{background:transparent;color:var(--mu);border:1.5px solid var(--br);}.bg:hover{color:var(--red);border-color:var(--red);}
-.bw{width:100%;padding:.66rem;font-size:.95rem;margin-top:.4rem;}
-.bsubmit{width:100%;padding:.75rem;margin-top:1.5rem;}
+.bw{background:#FFF7ED;color:#C2410C;border:1px solid #FED7AA;}.bw:hover{background:#FFEDD5;}
+.bg{background:transparent;color:var(--mu);border:1.5px solid var(--br);}
+.bg:hover{color:var(--red);border-color:var(--red);}
+.bfull{width:100%;padding:.68rem;font-size:.95rem;margin-top:.4rem;}
+.bsubmit{width:100%;padding:.78rem;margin-top:1.5rem;
+  background:linear-gradient(135deg,var(--ac),#7C3AED);color:#fff;
+  box-shadow:0 4px 16px rgba(37,99,235,.35);border-radius:var(--rd);}
+.bsubmit:hover{box-shadow:0 6px 22px rgba(37,99,235,.45);}
 
-.card{background:var(--sf);border:1px solid var(--br);border-radius:var(--rd);padding:.9rem 1.05rem;
-  display:flex;align-items:center;gap:.85rem;margin-bottom:.55rem;box-shadow:var(--sh);transition:box-shadow .15s;}
-.card.clk{cursor:pointer;}.card.clk:hover{box-shadow:var(--shm);}
-.card.locked{opacity:.55;background:#F8FAFC;}
-.ci{flex:1;min-width:0;}.ci h3{font-size:.93rem;font-weight:600;margin-bottom:.16rem;}.ci p{font-size:.8rem;color:var(--mu);}
+/* ── CARDS ──────────────────────────────────────────────── */
+.card{background:var(--sf);border:1px solid var(--br);border-radius:var(--rd);
+  padding:.95rem 1.1rem;display:flex;align-items:center;gap:.9rem;
+  margin-bottom:.6rem;box-shadow:var(--sh);
+  transition:box-shadow .2s,transform .2s,border-color .2s;
+  animation:fadeUp .3s ease both;}
+.card.clk{cursor:pointer;}
+.card.clk:hover{box-shadow:var(--shm);transform:translateY(-2px);border-color:rgba(37,99,235,.2);}
+.card.locked{opacity:.52;background:#F8FAFC;}
+.ci{flex:1;min-width:0;}.ci h3{font-size:.93rem;font-weight:600;margin-bottom:.18rem;}
+.ci p{font-size:.8rem;color:var(--mu);}
 .ca{display:flex;gap:.38rem;flex-shrink:0;flex-wrap:wrap;}
-.carrow{font-size:1.15rem;color:var(--ac);}
-.licon{font-size:1.3rem;flex-shrink:0;}
+.carrow{font-size:1.2rem;color:var(--ac);transition:transform .2s;}
+.card.clk:hover .carrow{transform:translateX(4px);}
+.licon{font-size:1.35rem;flex-shrink:0;}
 
-.ph{display:flex;align-items:center;gap:.85rem;margin-bottom:1.2rem;flex-wrap:wrap;}
-.ph h1{font-family:'Sora',sans-serif;font-size:1.35rem;font-weight:700;flex:1;}
+/* ── PAGE HEADERS ─────────────────────────────────────────── */
+.ph{display:flex;align-items:center;gap:.85rem;margin-bottom:1.3rem;flex-wrap:wrap;
+  animation:fadeUp .3s ease;}
+.ph h1{font-family:'Sora',sans-serif;font-size:1.4rem;font-weight:700;flex:1;}
 .bbk{background:none;border:none;cursor:pointer;color:var(--ac);font-size:.84rem;
-  font-family:'Inter',sans-serif;font-weight:600;padding:.3rem .5rem;border-radius:var(--rds);}
+  font-family:'Inter',sans-serif;font-weight:600;padding:.3rem .5rem;border-radius:var(--rds);
+  transition:background .15s,transform .1s;}
 .bbk:hover{background:var(--ac-lt);}
+.bbk:active{transform:scale(.95);}
 
-.mover{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.44);
-  display:flex;align-items:center;justify-content:center;padding:1rem;}
-.mbox{background:var(--sf);border-radius:16px;padding:1.6rem;width:100%;max-width:510px;
-  max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.18);}
+/* ── MODALS ──────────────────────────────────────────────── */
+.mover{position:fixed;inset:0;z-index:200;background:rgba(15,23,42,.5);
+  display:flex;align-items:center;justify-content:center;padding:1rem;
+  animation:fadeIn .2s ease;}
+.mbox{background:var(--sf);border-radius:18px;padding:1.7rem;width:100%;
+  max-width:520px;max-height:92vh;overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.2);animation:pop .3s cubic-bezier(.34,1.56,.64,1);}
 .mbox h2{font-family:'Sora',sans-serif;font-size:1.15rem;margin-bottom:.95rem;}
-.mactions{display:flex;gap:.55rem;justify-content:flex-end;margin-top:.95rem;}
+.mactions{display:flex;gap:.55rem;justify-content:flex-end;margin-top:1rem;}
 
-/* editor */
+/* ── TOPIC EDITOR ─────────────────────────────────────────── */
 .etb{display:flex;gap:.45rem;flex-wrap:wrap;padding:.85rem;background:var(--sf);
-  border-radius:var(--rd);border:1px solid var(--br);margin-bottom:1rem;}
+  border-radius:var(--rd);border:1px solid var(--br);margin-bottom:1rem;
+  animation:fadeUp .3s ease;}
 .etb span{font-size:.78rem;font-weight:600;color:var(--mu);align-self:center;margin-right:.2rem;}
-.bwrap{background:var(--sf);border:1.5px solid var(--br);border-radius:var(--rd);margin-bottom:.65rem;overflow:hidden;}
-.bhdr{display:flex;align-items:center;justify-content:space-between;padding:.5rem .85rem;background:var(--bg);border-bottom:1px solid var(--br);}
+.bwrap{background:var(--sf);border:1.5px solid var(--br);border-radius:var(--rd);
+  margin-bottom:.65rem;overflow:hidden;animation:slideRight .25s ease both;
+  transition:border-color .2s,box-shadow .2s;}
+.bwrap:hover{border-color:rgba(37,99,235,.25);box-shadow:0 2px 10px rgba(37,99,235,.07);}
+.bhdr{display:flex;align-items:center;justify-content:space-between;
+  padding:.5rem .85rem;background:var(--bg);border-bottom:1px solid var(--br);}
 .btype{font-size:.78rem;font-weight:600;color:var(--mu);}
 .bbtns{display:flex;gap:.3rem;}
 .xbtn{background:none;border:1px solid var(--br);border-radius:5px;cursor:pointer;
-  font-size:.75rem;padding:.18rem .45rem;color:var(--mu);font-family:'Inter',sans-serif;transition:all .15s;}
+  font-size:.75rem;padding:.18rem .45rem;color:var(--mu);font-family:'Inter',sans-serif;
+  transition:all .15s;}
 .xbtn:hover{background:var(--bg);}
 .xdel:hover{background:#FEE2E2;color:var(--red);border-color:var(--red);}
 .bbody{padding:.85rem;}
@@ -102,72 +192,142 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .binp{width:100%;margin-bottom:.45rem;}
 .bhint{font-size:.74rem;color:var(--mu);margin:.3rem 0;}.bhint a{color:var(--ac);}
 .bprev{max-width:100%;max-height:160px;border-radius:var(--rds);margin-top:.55rem;object-fit:contain;}
-.efooter{display:flex;gap:.65rem;justify-content:flex-end;margin-top:1.1rem;padding-top:.9rem;border-top:1px solid var(--br);}
+.efooter{display:flex;gap:.65rem;justify-content:flex-end;margin-top:1.1rem;
+  padding-top:.9rem;border-top:1px solid var(--br);}
 
-/* topic content */
-.tblock{margin-bottom:1.5rem;}
-.ttext{line-height:1.8;font-size:.96rem;}
-.timg{max-width:100%;border-radius:var(--rd);display:block;box-shadow:var(--sh);}
-.imgerr{background:var(--bg);border:1px dashed var(--br);border-radius:var(--rd);padding:1.2rem;text-align:center;font-size:.85rem;color:var(--mu);}
-.vwrap{border-radius:var(--rd);overflow:hidden;background:#000;aspect-ratio:16/9;width:100%;}
+/* ── TOPIC CONTENT ────────────────────────────────────────── */
+.tblock{margin-bottom:1.6rem;animation:fadeUp .3s ease both;}
+.tblock:nth-child(1){animation-delay:.05s}.tblock:nth-child(2){animation-delay:.1s}
+.tblock:nth-child(3){animation-delay:.15s}.tblock:nth-child(n+4){animation-delay:.2s}
+.ttext{line-height:1.82;font-size:.96rem;}
+.timg{max-width:100%;border-radius:var(--rd);display:block;box-shadow:var(--sh);
+  transition:transform .3s,box-shadow .3s;cursor:zoom-in;}
+.timg:hover{transform:scale(1.01);box-shadow:var(--shm);}
+.imgerr{background:var(--bg);border:1px dashed var(--br);border-radius:var(--rd);
+  padding:1.2rem;text-align:center;font-size:.85rem;color:var(--mu);}
+.vwrap{border-radius:var(--rd);overflow:hidden;background:#000;aspect-ratio:16/9;width:100%;
+  box-shadow:var(--sh);}
 .vwrap iframe,.vwrap video{width:100%;height:100%;display:block;}
 .vifwrap{width:100%;}.vifwrap iframe{width:100%;height:360px;display:block;border:none;}
-.vlink{background:var(--bg);border:2px dashed var(--br);border-radius:var(--rd);padding:1.75rem;
-  text-align:center;display:flex;flex-direction:column;align-items:center;gap:.65rem;}
-.vlico{font-size:2.2rem;opacity:.35;}
-.qblock{background:var(--ac-lt);border-left:4px solid var(--ac);border-radius:0 var(--rd) var(--rd) 0;padding:.9rem 1rem;}
-.qlbl{font-size:.93rem;font-weight:600;color:var(--ac);margin-bottom:.55rem;}
-.ata{width:100%;min-height:78px;}
-.pans{background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);padding:.6rem .82rem;font-size:.9rem;}
-.fbok{background:#D1FAE5;border-radius:var(--rd);padding:.95rem 1.1rem;}
+.vlink{background:var(--bg);border:2px dashed var(--br);border-radius:var(--rd);
+  padding:1.75rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.65rem;}
+.vlico{font-size:2.5rem;opacity:.3;animation:bounce 2s ease infinite;}
+.qblock{background:linear-gradient(135deg,#EFF6FF,#F5F3FF);
+  border-left:4px solid var(--ac);border-radius:0 var(--rd) var(--rd) 0;
+  padding:.95rem 1.1rem;box-shadow:0 2px 8px rgba(37,99,235,.08);}
+.qlbl{font-size:.93rem;font-weight:600;color:var(--ac);margin-bottom:.6rem;
+  display:flex;align-items:center;gap:.5rem;}
+.ata{width:100%;min-height:80px;transition:border-color .2s,box-shadow .2s;}
+.pans{background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);
+  padding:.6rem .82rem;font-size:.9rem;}
+.fbok{background:linear-gradient(135deg,#D1FAE5,#ECFDF5);border-radius:var(--rd);
+  padding:1rem 1.15rem;border:1px solid #A7F3D0;animation:pop .4s ease;}
 .fbok h4{margin-bottom:.4rem;color:#065F46;font-size:.93rem;}
-.fbwait{background:#FEF3C7;border-radius:var(--rd);padding:.95rem 1.1rem;color:#92400E;font-weight:600;font-size:.88rem;}
+.fbwait{background:linear-gradient(135deg,#FEF3C7,#FFFBEB);border-radius:var(--rd);
+  padding:1rem 1.15rem;color:#92400E;font-weight:600;font-size:.88rem;
+  border:1px solid #FDE68A;animation:fadeIn .3s ease;}
 
-/* answers */
+/* ── GRADES (custom) ────────────────────────────────────── */
+.grade-chip{display:inline-flex;align-items:center;gap:.3rem;
+  font-size:.8rem;font-weight:700;padding:3px 10px;border-radius:20px;
+  margin-left:.35rem;border:1.5px solid transparent;cursor:default;
+  transition:transform .15s;}
+.grade-chip:hover{transform:scale(1.08);}
+.grade-chip.gsize-big{font-size:1rem;padding:5px 14px;}
+.grade-circle{width:8px;height:8px;border-radius:50%;background:currentColor;opacity:.7;flex-shrink:0;}
+
+/* ── ANSWERS ─────────────────────────────────────────────── */
 .acard{flex-direction:column;align-items:stretch;}
-.ahdr{display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;margin-bottom:.8rem;flex-wrap:wrap;}
+.ahdr{display:flex;align-items:flex-start;justify-content:space-between;
+  gap:.65rem;margin-bottom:.8rem;flex-wrap:wrap;}
 .sbadge{font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
-.spend{background:#FEF3C7;color:#92400E;}.schk{background:#D1FAE5;color:#065F46;}
-.qablock{background:var(--bg);border-radius:var(--rds);padding:.55rem .8rem;margin-bottom:.38rem;}
+.spend{background:#FEF3C7;color:#92400E;animation:pulse 2s ease infinite;}
+.schk{background:#D1FAE5;color:#065F46;}
+.qablock{background:var(--bg);border-radius:var(--rds);padding:.55rem .82rem;margin-bottom:.4rem;}
 .qt{font-size:.77rem;color:var(--mu);margin-bottom:.18rem;}.at{font-size:.88rem;}
-.fbrow{display:flex;gap:.65rem;align-items:flex-end;flex-wrap:wrap;padding-top:.7rem;border-top:1px solid var(--br);}
-.fbl{flex:0 0 115px;}.fbr{flex:1;min-width:140px;}
+.fbrow{display:flex;gap:.65rem;align-items:flex-end;flex-wrap:wrap;
+  padding-top:.72rem;border-top:1px solid var(--br);}
+.fbl{flex:0 0 175px;}.fbr{flex:1;min-width:140px;}
 .fbinp{min-height:52px;}.fbbtn{flex-shrink:0;align-self:flex-end;}
-.gsel{padding:.45rem .6rem;}
 
-/* grades */
-.gbadge{display:inline-block;font-size:.78rem;font-weight:700;padding:2px 9px;border-radius:20px;margin-left:.35rem;}
-.gbig{font-size:1.05rem;padding:4px 13px;}
-.cg{background:#D1FAE5;color:#065F46;}.cb{background:#DBEAFE;color:#1E40AF;}
-.co{background:#FEF3C7;color:#92400E;}.cr{background:#FEE2E2;color:#991B1B;}
-.cdr{background:#450a0a;color:#fca5a5;}.cgr{background:#F3F4F6;color:#374151;}
-.gsec{margin-bottom:1.3rem;}
-.gname{font-size:.95rem;font-weight:700;color:var(--ac);margin-bottom:.45rem;}
-.grow{display:flex;align-items:center;gap:.7rem;padding:.48rem .7rem;
-  background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);margin-bottom:.3rem;}
+/* ── GRADES JOURNAL ──────────────────────────────────────── */
+.gsec{margin-bottom:1.4rem;animation:fadeUp .3s ease both;}
+.gname{font-size:.95rem;font-weight:700;color:var(--ac);margin-bottom:.5rem;}
+.grow{display:flex;align-items:center;gap:.7rem;padding:.5rem .75rem;
+  background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);
+  margin-bottom:.32rem;transition:box-shadow .15s;}
+.grow:hover{box-shadow:var(--sh);}
 .gtopic{flex:1;font-size:.88rem;font-weight:500;}
-.gfb{font-size:.8rem;color:var(--mu);margin-top:.3rem;}
+.gfb{font-size:.8rem;color:var(--mu);margin-top:.32rem;}
 
+/* ── ROLES / BADGES / GROUPS ─────────────────────────────── */
 .rbadge{font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:20px;display:inline-block;}
 .ra{background:#EDE9FE;color:#5B21B6;}.rt{background:#D1FAE5;color:#065F46;}.rs{background:var(--ac-lt);color:var(--ac);}
-.grptag{display:inline-block;font-size:.7rem;font-weight:600;background:#FEF3C7;color:#92400E;border-radius:20px;padding:1px 7px;margin-left:.3rem;}
-.arow{padding:.55rem 0;border-bottom:1px solid var(--br);}
-.albl{display:flex;align-items:center;gap:.55rem;cursor:pointer;}
-.albl input[type=checkbox]{width:auto;flex-shrink:0;}.albl .aname{font-weight:600;font-size:.88rem;}
+.grptag{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;font-weight:600;
+  background:#FEF3C7;color:#92400E;border-radius:20px;padding:1px 8px;margin-left:.3rem;
+  transition:background .15s;}
+.grptag:hover{background:#FDE68A;}
+.arow{padding:.55rem 0;border-bottom:1px solid var(--br);transition:background .15s;}
+.arow:hover{background:var(--bg);}
+.albl{display:flex;align-items:center;gap:.55rem;cursor:pointer;padding:.2rem .3rem;border-radius:var(--rds);}
+.albl input[type=checkbox]{width:auto;flex-shrink:0;}
+.albl .aname{font-weight:600;font-size:.88rem;}
 .albl small{color:var(--mu);font-size:.77rem;margin-left:auto;}
-.swrap{margin-bottom:.95rem;}
 
-.toast{position:fixed;bottom:1.2rem;right:1.2rem;z-index:999;background:var(--tx);color:#fff;
-  padding:.6rem 1rem;border-radius:var(--rds);font-size:.84rem;font-weight:500;
-  box-shadow:var(--shm);animation:si .2s ease;}
-.tok{background:#15803D;}.terr{background:var(--red);}
-@keyframes si{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
-@media(max-width:600px){.card{flex-wrap:wrap;}.ca{width:100%;}.fbrow{flex-direction:column;}.fbl,.fbr{flex:1 1 100%;}}
+/* ── GRADE EDITOR ─────────────────────────────────────────── */
+.grade-list{display:flex;flex-direction:column;gap:.45rem;margin-bottom:1rem;}
+.grade-item{display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;
+  background:var(--bg);border-radius:var(--rds);border:1px solid var(--br);
+  animation:slideRight .25s ease both;transition:box-shadow .15s;}
+.grade-item:hover{box-shadow:var(--sh);}
+.grade-item .gi-label{flex:1;font-weight:600;font-size:.9rem;}
+.grade-item .gi-color{width:22px;height:22px;border-radius:50%;flex-shrink:0;border:2px solid rgba(0,0,0,.1);}
+.grade-add-form{display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;
+  padding:.85rem;background:var(--sf);border-radius:var(--rd);border:1px solid var(--br);}
+.grade-add-form .fg{margin:0;flex:1;min-width:130px;}
+.color-swatches{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.3rem;}
+.swatch{width:24px;height:24px;border-radius:50%;cursor:pointer;border:2px solid transparent;
+  transition:transform .15s,border-color .15s;}
+.swatch:hover{transform:scale(1.15);}
+.swatch.active{border-color:var(--tx);}
+
+/* ── GROUP TABS ───────────────────────────────────────────── */
+.group-tabs{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;}
+.gtab{background:var(--bg);border:1.5px solid var(--br);border-radius:20px;
+  padding:.3rem .85rem;font-size:.8rem;font-weight:600;cursor:pointer;
+  transition:all .18s;color:var(--mu);}
+.gtab.active,.gtab:hover{background:var(--ac-lt);border-color:var(--ac);color:var(--ac);}
+
+/* ── SEARCH ───────────────────────────────────────────────── */
+.swrap{margin-bottom:1rem;position:relative;}
+.swrap input{padding-left:2.2rem;}
+.swrap::before{content:'🔍';position:absolute;left:.7rem;top:50%;transform:translateY(-50%);font-size:.85rem;pointer-events:none;}
+
+/* ── LOADING ──────────────────────────────────────────────── */
+.spinner{display:inline-block;width:20px;height:20px;border:2.5px solid var(--br);
+  border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.4rem;}
+.skeleton{background:linear-gradient(90deg,var(--bg) 25%,var(--br) 50%,var(--bg) 75%);
+  background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:var(--rds);height:60px;margin-bottom:.6rem;}
+
+/* ── TOASTS ───────────────────────────────────────────────── */
+.toast{position:fixed;bottom:1.3rem;right:1.3rem;z-index:999;
+  background:var(--tx);color:#fff;padding:.65rem 1.1rem;border-radius:var(--rds);
+  font-size:.85rem;font-weight:500;box-shadow:var(--shm);
+  animation:slideRight .25s ease,fadeIn .25s ease;}
+.tok{background:linear-gradient(135deg,#15803D,#16a34a);}
+.terr{background:linear-gradient(135deg,#DC2626,#ef4444);}
+.tinfo{background:linear-gradient(135deg,var(--ac),#7C3AED);}
+
+@media(max-width:600px){
+  .card{flex-wrap:wrap;}.ca{width:100%;}
+  .fbrow{flex-direction:column;}.fbl,.fbr{flex:1 1 100%;}
+  .grade-add-form{flex-direction:column;}
+}
 </style>
 </head>
 <body>
 
-<!-- NAV -->
+<!-- ═══ NAV ════════════════════════════════════════════════════ -->
 <nav id="app-nav" class="hidden">
   <div class="nav-brand">
     <img class="logo-img" src="" alt=""/>
@@ -175,17 +335,19 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   </div>
   <button class="nbtn hidden" id="nca">Курсы</button>
   <button class="nbtn hidden" id="nua">Пользователи</button>
+  <button class="nbtn hidden" id="ngrpa">Группы</button>
+  <button class="nbtn hidden" id="ngra">Оценки</button>
   <button class="nbtn hidden" id="naa">Ответы</button>
   <button class="nbtn hidden" id="nga">Журнал оценок</button>
-  <button class="nbtn hidden" id="nat">Ответы студентов</button>
+  <button class="nbtn hidden" id="nat">Ответы</button>
   <button class="nbtn hidden" id="ngt">Журнал оценок</button>
   <button class="nbtn hidden" id="ncs">Мои курсы</button>
   <button class="nbtn hidden" id="ngs">Мои оценки</button>
-  <span class="nav-user"><span id="nusr"></span>&nbsp;·&nbsp;<span class="nav-rbadge" id="nrole"></span></span>
+  <span class="nav-user"><span id="nusr"></span>&nbsp;·&nbsp;<span class="nav-rb" id="nrole"></span></span>
   <button class="nbtn" id="nout">Выйти</button>
 </nav>
 
-<!-- LOGIN -->
+<!-- ═══ LOGIN ══════════════════════════════════════════════════ -->
 <div id="screen-login" class="screen">
   <div class="lbox">
     <div class="llogo">
@@ -195,17 +357,17 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
     </div>
     <div class="fg"><label>Email</label><input type="email" id="lemail" placeholder="example@mail.ru"/></div>
     <div class="fg"><label>Пароль</label><input type="password" id="lpass" placeholder="••••••••"/></div>
-    <button class="btn bp bw" id="btnlogin">Войти</button>
+    <button class="btn bp bfull" id="btnlogin">Войти</button>
   </div>
 </div>
 
-<!-- ADMIN COURSES -->
+<!-- ═══ ADMIN COURSES ══════════════════════════════════════════ -->
 <div id="screen-ac" class="screen hidden">
   <div class="ph"><h1>Курсы</h1><button class="btn bp btn-sm" id="btnnc">+ Новый курс</button></div>
   <div id="list-ac"></div>
 </div>
 
-<!-- ADMIN TOPICS -->
+<!-- ═══ ADMIN TOPICS ═══════════════════════════════════════════ -->
 <div id="screen-at" class="screen hidden">
   <div class="ph">
     <button class="bbk" id="back-at">← Назад</button>
@@ -215,12 +377,9 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   <div id="list-at"></div>
 </div>
 
-<!-- TOPIC EDITOR -->
+<!-- ═══ TOPIC EDITOR ════════════════════════════════════════════ -->
 <div id="screen-te" class="screen hidden">
-  <div class="ph">
-    <button class="bbk" id="back-te">← К темам</button>
-    <h1 id="lbl-te">Тема</h1>
-  </div>
+  <div class="ph"><button class="bbk" id="back-te">← К темам</button><h1 id="lbl-te">Тема</h1></div>
   <div style="display:flex;gap:.9rem;margin-bottom:1rem;flex-wrap:wrap;">
     <div class="fg" style="flex:1;min-width:180px;margin:0"><label>Название темы</label><input type="text" id="te-title" placeholder="Тема 1 — Введение"/></div>
     <div class="fg" style="width:110px;margin:0"><label>Порядок</label><input type="number" id="te-order" value="0" min="0"/></div>
@@ -239,126 +398,149 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   </div>
 </div>
 
-<!-- ADMIN USERS -->
+<!-- ═══ ADMIN USERS ═════════════════════════════════════════════ -->
 <div id="screen-au" class="screen hidden">
   <div class="ph"><h1>Пользователи</h1><button class="btn bp btn-sm" id="btnnu">+ Создать</button></div>
+  <div class="swrap"><input type="text" id="usearch" placeholder="Поиск по имени или email..."/></div>
   <div id="list-au"></div>
 </div>
 
-<!-- TEACHER ANSWERS -->
+<!-- ═══ GROUPS ══════════════════════════════════════════════════ -->
+<div id="screen-grp" class="screen hidden">
+  <div class="ph"><h1>Группы</h1><button class="btn bp btn-sm" id="btnngrp">+ Новая группа</button></div>
+  <div id="list-grp"></div>
+</div>
+
+<!-- ═══ GRADE SETTINGS ══════════════════════════════════════════ -->
+<div id="screen-gr" class="screen hidden">
+  <div class="ph"><h1>Настройка оценок</h1></div>
+  <p class="muted" style="margin-bottom:1rem">Создавай свои оценки — они будут доступны преподавателям при проверке ответов.</p>
+  <div class="grade-add-form anim-fade-up">
+    <div class="fg"><label>Название оценки</label><input type="text" id="gr-name" placeholder="Отлично, Молодец, На переделку..."/></div>
+    <div class="fg" style="min-width:200px">
+      <label>Цвет</label>
+      <div class="color-swatches" id="gr-swatches"></div>
+    </div>
+    <button class="btn bp btn-sm" style="align-self:flex-end;margin-bottom:.28rem" id="gr-add">+ Добавить</button>
+  </div>
+  <div class="grade-list" id="grade-list"></div>
+</div>
+
+<!-- ═══ TEACHER ANSWERS ══════════════════════════════════════════ -->
 <div id="screen-ta" class="screen hidden">
   <div class="ph"><h1>Ответы студентов</h1></div>
-  <div class="swrap"><input type="text" id="asearch" placeholder="🔍 Поиск..."/></div>
+  <div class="swrap"><input type="text" id="asearch" placeholder="Поиск по имени или теме..."/></div>
   <div id="list-ta"></div>
 </div>
 
-<!-- GRADES JOURNAL -->
+<!-- ═══ GRADES JOURNAL ══════════════════════════════════════════ -->
 <div id="screen-gj" class="screen hidden">
   <div class="ph"><h1>Журнал оценок</h1></div>
   <div id="list-gj"></div>
 </div>
 
-<!-- MY GRADES -->
+<!-- ═══ MY GRADES ════════════════════════════════════════════════ -->
 <div id="screen-mg" class="screen hidden">
   <div class="ph"><h1>Мои оценки</h1></div>
   <div id="list-mg"></div>
 </div>
 
-<!-- STUDENT COURSES -->
+<!-- ═══ STUDENT COURSES ══════════════════════════════════════════ -->
 <div id="screen-sc" class="screen hidden">
   <div class="ph"><h1>Мои курсы</h1></div>
   <div id="list-sc"></div>
 </div>
 
-<!-- STUDENT TOPICS -->
+<!-- ═══ STUDENT TOPICS ══════════════════════════════════════════ -->
 <div id="screen-st" class="screen hidden">
-  <div class="ph">
-    <button class="bbk" id="back-st">← К курсам</button>
-    <h1 id="lbl-sc"></h1>
-  </div>
+  <div class="ph"><button class="bbk" id="back-st">← К курсам</button><h1 id="lbl-sc"></h1></div>
   <div id="list-st"></div>
 </div>
 
-<!-- STUDENT TOPIC VIEW -->
+<!-- ═══ TOPIC VIEW ═══════════════════════════════════════════════ -->
 <div id="screen-sv" class="screen hidden">
-  <div class="ph">
-    <button class="bbk" id="back-sv">← К темам</button>
-    <h1 id="lbl-sv"></h1>
-  </div>
+  <div class="ph"><button class="bbk" id="back-sv">← К темам</button><h1 id="lbl-sv"></h1></div>
   <div id="topic-content"></div>
   <div id="topic-status"></div>
 </div>
 
-<!-- MODAL: NEW COURSE -->
+<!-- ═══ MODALS ═══════════════════════════════════════════════════ -->
+
+<!-- New course -->
 <div id="m-nc" class="mover hidden">
   <div class="mbox">
     <h2>Новый курс</h2>
     <div class="fg"><label>Название</label><input type="text" id="nc-title" placeholder="Математика 10 класс"/></div>
     <div class="fg"><label>Описание</label><textarea id="nc-desc" placeholder="Краткое описание..."></textarea></div>
-    <div class="mactions">
-      <button class="btn bg" id="nc-cancel">Отмена</button>
-      <button class="btn bp" id="nc-save">Создать</button>
-    </div>
+    <div class="mactions"><button class="btn bg" id="nc-cancel">Отмена</button><button class="btn bp" id="nc-save">Создать</button></div>
   </div>
 </div>
 
-<!-- MODAL: COURSE ACCESS -->
+<!-- Course access -->
 <div id="m-ca" class="mover hidden">
   <div class="mbox">
     <h2>Доступ к курсу</h2>
     <p class="muted" style="margin-bottom:.5rem">Курс: <strong id="ca-name"></strong></p>
-    <p style="font-size:.79rem;color:var(--mu);margin-bottom:.75rem">Отмеченные студенты видят и могут открывать этот курс:</p>
+    <div class="group-tabs" id="ca-tabs"></div>
     <div id="ca-list"></div>
-    <div class="mactions">
-      <button class="btn bg" id="ca-cancel">Отмена</button>
-      <button class="btn bp" id="ca-save">Сохранить</button>
-    </div>
+    <div class="mactions"><button class="btn bg" id="ca-cancel">Отмена</button><button class="btn bp" id="ca-save">Сохранить</button></div>
   </div>
 </div>
 
-<!-- MODAL: TOPIC ACCESS -->
+<!-- Topic access -->
 <div id="m-ta" class="mover hidden">
   <div class="mbox">
     <h2>Доступ к теме</h2>
     <p class="muted" style="margin-bottom:.5rem">Тема: <strong id="ta-name"></strong></p>
-    <p style="font-size:.79rem;color:var(--mu);margin-bottom:.75rem">Только студенты записанные на курс. Отмеченные могут открыть эту тему:</p>
+    <div class="group-tabs" id="ta-tabs"></div>
     <div id="ta-list"></div>
-    <div class="mactions">
-      <button class="btn bg" id="ta-cancel">Отмена</button>
-      <button class="btn bp" id="ta-save">Сохранить</button>
-    </div>
+    <div class="mactions"><button class="btn bg" id="ta-cancel">Отмена</button><button class="btn bp" id="ta-save">Сохранить</button></div>
   </div>
 </div>
 
-<!-- MODAL: NEW USER -->
+<!-- User -->
 <div id="m-nu" class="mover hidden">
   <div class="mbox">
     <h2 id="nu-title">Новый пользователь</h2>
     <div class="fg"><label>Имя</label><input type="text" id="nu-name" placeholder="Иванов Иван"/></div>
     <div class="fg"><label>Email</label><input type="email" id="nu-email" placeholder="ivan@school.ru"/></div>
-    <div class="fg" id="nu-pass-wrap"><label>Пароль</label><input type="password" id="nu-pass" placeholder="мин. 6 символов"/></div>
+    <div class="fg" id="nu-pwrap"><label>Пароль</label><input type="password" id="nu-pass" placeholder="мин. 6 символов"/></div>
     <div class="fg"><label>Роль</label>
-      <select id="nu-role">
-        <option value="student">Студент</option>
-        <option value="teacher">Преподаватель</option>
-        <option value="admin">Администратор</option>
-      </select>
+      <select id="nu-role"><option value="student">Студент</option><option value="teacher">Преподаватель</option><option value="admin">Администратор</option></select>
     </div>
     <div class="fg"><label>Группа <span style="font-weight:400;color:var(--mu)">(необязательно)</span></label>
-      <input type="text" id="nu-group" placeholder="Например: Группа А, 10Б, 2024"/>
+      <select id="nu-group"><option value="">— без группы —</option></select>
     </div>
-    <div class="mactions">
-      <button class="btn bg" id="nu-cancel">Отмена</button>
-      <button class="btn bp" id="nu-save">Сохранить</button>
-    </div>
+    <div class="mactions"><button class="btn bg" id="nu-cancel">Отмена</button><button class="btn bp" id="nu-save">Сохранить</button></div>
+  </div>
+</div>
+
+<!-- Reset password -->
+<div id="m-rp" class="mover hidden">
+  <div class="mbox">
+    <h2>Сброс пароля</h2>
+    <p class="muted" style="margin-bottom:.85rem">Пользователь: <strong id="rp-name"></strong></p>
+    <div class="fg"><label>Новый пароль</label><input type="password" id="rp-pass" placeholder="мин. 6 символов"/></div>
+    <p style="font-size:.78rem;color:var(--mu);margin-top:.25rem">Пароль изменится немедленно в Firebase Auth.</p>
+    <div class="mactions"><button class="btn bg" id="rp-cancel">Отмена</button><button class="btn bw" id="rp-save">Сменить пароль</button></div>
+  </div>
+</div>
+
+<!-- New group -->
+<div id="m-ng" class="mover hidden">
+  <div class="mbox">
+    <h2 id="ng-title">Новая группа</h2>
+    <div class="fg"><label>Название группы</label><input type="text" id="ng-name" placeholder="Группа А, 10Б, 2024..."/></div>
+    <div class="fg"><label>Описание</label><input type="text" id="ng-desc" placeholder="Необязательно"/></div>
+    <div class="mactions"><button class="btn bg" id="ng-cancel">Отмена</button><button class="btn bp" id="ng-save">Сохранить</button></div>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     FIREBASE — скрипт в конце body, после всего HTML
+     MAIN SCRIPT — в конце body, все элементы уже существуют
      ════════════════════════════════════════════════════════════ -->
 <script type="module">
-import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp }  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc,
@@ -377,409 +559,598 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-// ── Логотип ──────────────────────────────────────────────────
-(()=>{const p=new Image();p.onload=()=>{document.querySelectorAll('.logo-img').forEach(e=>{e.src='logo.png';e.style.display='block';});document.querySelectorAll('.logo-text').forEach(e=>e.style.display='none');};p.src='logo.png';})();
+// ── Logo from root ─────────────────────────────────────────────
+(()=>{
+  const p=new Image();
+  p.onload=()=>{
+    document.querySelectorAll('.logo-img').forEach(e=>{e.src='logo.png';e.style.display='block';});
+    document.querySelectorAll('.logo-text').forEach(e=>e.style.display='none');
+  };
+  p.src='logo.png?'+Date.now();
+})();
 
-// ── Утилиты ──────────────────────────────────────────────────
-const $   = id => document.getElementById(id);
-const esc = s  => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-const fmt = ts => { if(!ts)return'—'; const d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); };
-const gc  = g  => { if(!g)return'cgr'; if(g.startsWith('A'))return'cg'; if(g.startsWith('B'))return'cb'; if(g.startsWith('C'))return'co'; if(g==='D')return'cr'; if(g==='F')return'cdr'; return'cgr'; };
+// ── Nav scroll shadow ─────────────────────────────────────────
+window.addEventListener('scroll',()=>{
+  document.getElementById('app-nav').classList.toggle('scrolled',window.scrollY>10);
+});
 
-function show(id){ document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden')); $(id)?.classList.remove('hidden'); }
-function mshow(id){ $(id).classList.remove('hidden'); }
-function mhide(id){ $(id).classList.add('hidden'); }
+// ── Utils ──────────────────────────────────────────────────────
+const $   = id=>document.getElementById(id);
+const esc = s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt = ts=>{if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});};
+
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));$(id)?.classList.remove('hidden');window.scrollTo(0,0);}
+function mshow(id){$(id).classList.remove('hidden');}
+function mhide(id){$(id).classList.add('hidden');}
 function toast(msg,type=''){
-  const t=document.createElement('div'); t.className='toast '+(type==='ok'?'tok':type==='err'?'terr':'');
-  t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),3500);
+  const t=document.createElement('div');
+  t.className='toast '+(type==='ok'?'tok':type==='err'?'terr':'tinfo');
+  t.textContent=msg;document.body.appendChild(t);
+  setTimeout(()=>{t.style.animation='fadeIn .2s ease reverse';setTimeout(()=>t.remove(),200);},3300);
 }
 
-// ── Состояние ─────────────────────────────────────────────────
-let CU=null, UP=null;           // currentUser, userProfile
-let CID=null;                   // selectedCourseId
-let ACID=null, ATID=null;       // accessCourseId, accessTopicId
-let EB=[], ETID=null, ECID=null;// editorBlocks, editorTopicId, editorCourseId
-let EUID=null;                  // editUserId (null=new)
+// ── State ──────────────────────────────────────────────────────
+let CU=null,UP=null;
+let CID=null;           // selectedCourseId
+let ACID=null,ATID=null;
+let EB=[],ETID=null,ECID=null;
+let EUID=null;          // edit user id
+let EGID=null;          // edit group id
+let RUID=null,RUNAME='';// reset pass user
+let GRADES=[];          // custom grades cache
+let GROUPS=[];          // groups cache
+let CHOSEN_COLOR='#22C55E';
+
+// ── Grade helpers ──────────────────────────────────────────────
+function gradeChip(g,big=false){
+  if(!g)return'';
+  const color=g.color||'#64748B';
+  const fg=lightnessOk(color)?'#fff':darken(color);
+  return `<span class="grade-chip${big?' gsize-big':''}" style="background:${color}22;color:${color};border-color:${color}44">
+    <span class="grade-circle" style="background:${color}"></span>${esc(g.label||g)}
+  </span>`;
+}
+function lightnessOk(hex){
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+  return(r*299+g*587+b*114)/1000<128;
+}
+function darken(hex){return hex;}
+
+const SWATCHES=['#22C55E','#3B82F6','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#64748B','#F97316','#14B8A6'];
 
 // ═══════════════════════════════════════════════════════════════
 //  AUTH
 // ═══════════════════════════════════════════════════════════════
-onAuthStateChanged(auth, async user=>{
-  if(!user){ show('screen-login'); return; }
+onAuthStateChanged(auth,async user=>{
+  if(!user){show('screen-login');return;}
   const snap=await getDoc(doc(db,'users',user.uid));
-  if(!snap.exists()){ await signOut(auth); show('screen-login'); toast('Пользователь не найден','err'); return; }
-  CU=user; UP=snap.data(); applyNav();
-  if(UP.role==='admin')       { await loadCourses(); show('screen-ac'); }
-  else if(UP.role==='teacher'){ await loadAnswers(); show('screen-ta'); }
-  else                        { await loadMyCourses(); show('screen-sc'); }
+  if(!snap.exists()){await signOut(auth);show('screen-login');toast('Пользователь не найден','err');return;}
+  CU=user;UP=snap.data();
+  await Promise.all([loadGradesCache(),loadGroupsCache()]);
+  applyNav();
+  if(UP.role==='admin')       {await loadCourses();show('screen-ac');}
+  else if(UP.role==='teacher'){await loadAnswers();show('screen-ta');}
+  else                        {await loadMyCourses();show('screen-sc');}
 });
 
 $('btnlogin').onclick=async()=>{
-  const email=$('lemail').value.trim(), pass=$('lpass').value;
-  if(!email||!pass){ toast('Заполни все поля','err'); return; }
-  try{ await signInWithEmailAndPassword(auth,email,pass); }
-  catch{ toast('Неверный email или пароль','err'); }
+  const email=$('lemail').value.trim(),pass=$('lpass').value;
+  if(!email||!pass){toast('Заполни все поля','err');return;}
+  $('btnlogin').innerHTML='<span class="spinner"></span>Вхожу...';
+  try{await signInWithEmailAndPassword(auth,email,pass);}
+  catch{toast('Неверный email или пароль','err');$('btnlogin').textContent='Войти';}
 };
-$('nout').onclick=async()=>{ await signOut(auth); $('app-nav').classList.add('hidden'); CU=null; UP=null; show('screen-login'); };
-
-// ── Нажатие Enter в поле пароля ──
-$('lpass').addEventListener('keydown', e=>{ if(e.key==='Enter') $('btnlogin').click(); });
+$('lpass').onkeydown=e=>{if(e.key==='Enter')$('btnlogin').click();};
+$('nout').onclick=async()=>{await signOut(auth);$('app-nav').classList.add('hidden');CU=null;UP=null;show('screen-login');};
 
 // ═══════════════════════════════════════════════════════════════
 //  NAV
 // ═══════════════════════════════════════════════════════════════
 function applyNav(){
   $('app-nav').classList.remove('hidden');
-  $('nusr').textContent  = UP.name||CU.email;
-  $('nrole').textContent = UP.role==='admin'?'Администратор':UP.role==='teacher'?'Преподаватель':'Студент';
-  const a=UP.role==='admin', t=UP.role==='teacher', s=UP.role==='student';
-  ['nca','nua','naa','nga'].forEach(id=>$(id).classList.toggle('hidden',!a));
+  $('nusr').textContent=UP.name||CU.email;
+  $('nrole').textContent=UP.role==='admin'?'Администратор':UP.role==='teacher'?'Преподаватель':'Студент';
+  const a=UP.role==='admin',t=UP.role==='teacher',s=UP.role==='student';
+  ['nca','nua','ngrpa','ngra','naa','nga'].forEach(id=>$(id).classList.toggle('hidden',!a));
   ['nat','ngt'].forEach(id=>$(id).classList.toggle('hidden',!t));
   ['ncs','ngs'].forEach(id=>$(id).classList.toggle('hidden',!s));
 }
-$('nca').onclick=()=>{ loadCourses();  show('screen-ac'); };
-$('nua').onclick=()=>{ loadUsers();    show('screen-au'); };
-$('naa').onclick=()=>{ loadAnswers();  show('screen-ta'); };
-$('nga').onclick=()=>{ loadGrades();   show('screen-gj'); };
-$('nat').onclick=()=>{ loadAnswers();  show('screen-ta'); };
-$('ngt').onclick=()=>{ loadGrades();   show('screen-gj'); };
-$('ncs').onclick=()=>{ loadMyCourses();show('screen-sc'); };
-$('ngs').onclick=()=>{ loadMyGrades(); show('screen-mg'); };
+$('nca').onclick=()=>{loadCourses();show('screen-ac');};
+$('nua').onclick=()=>{loadUsers();show('screen-au');};
+$('ngrpa').onclick=()=>{loadGroups();show('screen-grp');};
+$('ngra').onclick=()=>{renderGradeSettings();show('screen-gr');};
+$('naa').onclick=()=>{loadAnswers();show('screen-ta');};
+$('nga').onclick=()=>{loadGrades();show('screen-gj');};
+$('nat').onclick=()=>{loadAnswers();show('screen-ta');};
+$('ngt').onclick=()=>{loadGrades();show('screen-gj');};
+$('ncs').onclick=()=>{loadMyCourses();show('screen-sc');};
+$('ngs').onclick=()=>{loadMyGrades();show('screen-mg');};
 
 // ═══════════════════════════════════════════════════════════════
-//  COURSES (ADMIN)
+//  GRADES CACHE + SETTINGS
+// ═══════════════════════════════════════════════════════════════
+async function loadGradesCache(){
+  const snap=await getDocs(collection(db,'grades'));
+  GRADES=[];snap.forEach(d=>GRADES.push({id:d.id,...d.data()}));
+  GRADES.sort((a,b)=>(a.order||0)-(b.order||0));
+}
+
+function renderGradeSettings(){
+  // swatches
+  const sw=$('gr-swatches');sw.innerHTML='';
+  SWATCHES.forEach(c=>{
+    const s=document.createElement('div');s.className='swatch'+(c===CHOSEN_COLOR?' active':'');
+    s.style.background=c;s.dataset.color=c;sw.appendChild(s);
+  });
+  sw.addEventListener('click',e=>{
+    const s=e.target.closest('.swatch');if(!s)return;
+    CHOSEN_COLOR=s.dataset.color;
+    sw.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('active',x.dataset.color===CHOSEN_COLOR));
+  });
+
+  const list=$('grade-list');list.innerHTML='';
+  if(!GRADES.length){list.innerHTML='<p class="empty">Оценок нет. Создай первую!</p>';return;}
+  GRADES.forEach((g,idx)=>{
+    const item=document.createElement('div');item.className='grade-item';
+    item.style.animationDelay=idx*0.05+'s';
+    const col=g.color||'#64748B';
+    item.innerHTML=`<div class="gi-color" style="background:${col}"></div>
+      <span class="gi-label">${esc(g.label)}</span>
+      <button class="btn bg btn-sm" data-action="delgrade" data-id="${g.id}">Удалить</button>`;
+    list.appendChild(item);
+  });
+}
+
+$('gr-add').onclick=async()=>{
+  const label=$('gr-name').value.trim();
+  if(!label){toast('Введи название оценки','err');return;}
+  await addDoc(collection(db,'grades'),{label,color:CHOSEN_COLOR,order:GRADES.length,createdAt:serverTimestamp()});
+  $('gr-name').value='';
+  await loadGradesCache();renderGradeSettings();toast('Оценка добавлена','ok');
+};
+$('grade-list').addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-action]');if(!btn)return;
+  if(btn.dataset.action==='delgrade'){
+    if(!confirm('Удалить оценку?'))return;
+    await deleteDoc(doc(db,'grades',btn.dataset.id));
+    await loadGradesCache();renderGradeSettings();toast('Удалено');
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  GROUPS
+// ═══════════════════════════════════════════════════════════════
+async function loadGroupsCache(){
+  const snap=await getDocs(collection(db,'groups'));
+  GROUPS=[];snap.forEach(d=>GROUPS.push({id:d.id,...d.data()}));
+  GROUPS.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+}
+
+async function loadGroups(){
+  await loadGroupsCache();
+  const list=$('list-grp');list.innerHTML='';
+  if(!GROUPS.length){list.innerHTML='<p class="empty">Групп нет. Создай первую!</p>';return;}
+  GROUPS.forEach(g=>{
+    const card=document.createElement('div');card.className='card anim-fade-up';
+    card.innerHTML=`<div class="ci"><h3>${esc(g.name)}</h3><p>${esc(g.description||'')}</p></div>
+      <div class="ca">
+        <button class="btn bs btn-sm" data-action="editgrp" data-id="${g.id}" data-name="${esc(g.name)}" data-desc="${esc(g.description||'')}">✏ Изменить</button>
+        <button class="btn bg btn-sm" data-action="delgrp" data-id="${g.id}">Удалить</button>
+      </div>`;
+    list.appendChild(card);
+  });
+}
+
+$('list-grp').addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-action]');if(!btn)return;
+  if(btn.dataset.action==='editgrp'){
+    EGID=btn.dataset.id;
+    $('ng-title').textContent='Редактировать группу';
+    $('ng-name').value=btn.dataset.name;$('ng-desc').value=btn.dataset.desc;
+    mshow('m-ng');
+  }
+  if(btn.dataset.action==='delgrp'){
+    if(!confirm('Удалить группу?'))return;
+    await deleteDoc(doc(db,'groups',btn.dataset.id));
+    // убираем группу у студентов
+    const usn=await getDocs(query(collection(db,'users'),where('groupId','==',btn.dataset.id)));
+    await Promise.all(usn.docs.map(d=>updateDoc(doc(db,'users',d.id),{groupId:'',groupName:''})));
+    await loadGroupsCache();loadGroups();toast('Группа удалена');
+  }
+});
+
+$('btnngrp').onclick=()=>{EGID=null;$('ng-title').textContent='Новая группа';$('ng-name').value='';$('ng-desc').value='';mshow('m-ng');};
+$('ng-cancel').onclick=()=>mhide('m-ng');
+$('ng-save').onclick=async()=>{
+  const name=$('ng-name').value.trim();if(!name){toast('Введи название','err');return;}
+  const desc=$('ng-desc').value.trim();
+  if(EGID){
+    await updateDoc(doc(db,'groups',EGID),{name,description:desc});
+    // обновляем groupName у студентов
+    const usn=await getDocs(query(collection(db,'users'),where('groupId','==',EGID)));
+    await Promise.all(usn.docs.map(d=>updateDoc(doc(db,'users',d.id),{groupName:name})));
+    toast('Группа обновлена','ok');
+  } else {
+    await addDoc(collection(db,'groups'),{name,description:desc,createdAt:serverTimestamp()});
+    toast('Группа создана','ok');
+  }
+  EGID=null;mhide('m-ng');await loadGroupsCache();loadGroups();
+};
+
+// ── Populate group selector in user modal ────────────────────
+function fillGroupSelect(){
+  const sel=$('nu-group');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— без группы —</option>';
+  GROUPS.forEach(g=>{
+    const o=document.createElement('option');o.value=g.id;o.textContent=g.name;
+    if(g.id===cur)o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+// ── Group tabs helper ──────────────────────────────────────────
+function buildGroupTabs(containerId,listId,allStudents,checkedSet,filterFn){
+  const tabsEl=$(containerId);tabsEl.innerHTML='';
+  const tabs=[{id:'',name:'Все'},...GROUPS];
+  let activeGrp='';
+  function render(){
+    const listEl=$(listId);listEl.innerHTML='';
+    let shown=0;
+    allStudents.forEach(([uid,u])=>{
+      if(!filterFn(uid))return;
+      if(activeGrp&&u.groupId!==activeGrp)return;
+      shown++;
+      const row=document.createElement('div');row.className='arow';
+      const grp=u.groupName?` <span class="grptag">${esc(u.groupName)}</span>`:'';
+      row.innerHTML=`<label class="albl">
+        <input type="checkbox" data-uid="${uid}" ${checkedSet.has(uid)?'checked':''}/>
+        <span class="aname">${esc(u.name||u.email)}${grp}</span>
+        <small>${esc(u.email)}</small>
+      </label>`;
+      listEl.appendChild(row);
+    });
+    if(!shown)listEl.innerHTML='<p class="empty" style="padding:1rem">Нет студентов в этой группе</p>';
+  }
+  tabs.forEach(g=>{
+    const t=document.createElement('button');t.className='gtab'+(g.id===activeGrp?' active':'');
+    t.textContent=g.name;
+    t.addEventListener('click',()=>{
+      activeGrp=g.id;
+      tabsEl.querySelectorAll('.gtab').forEach(x=>x.classList.toggle('active',x.textContent===g.name));
+      render();
+    });
+    tabsEl.appendChild(t);
+  });
+  render();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  COURSES
 // ═══════════════════════════════════════════════════════════════
 async function loadCourses(){
   const snap=await getDocs(collection(db,'courses'));
-  const list=$('list-ac'); list.innerHTML='';
-  if(snap.empty){ list.innerHTML='<p class="empty-msg">Курсов нет. Создай первый!</p>'; return; }
-  snap.forEach(d=>{
+  const list=$('list-ac');list.innerHTML='';
+  if(snap.empty){list.innerHTML='<p class="empty">Курсов нет. Создай первый!</p>';return;}
+  snap.forEach((d,i)=>{
     const c=d.data();
-    const card=document.createElement('div'); card.className='card';
+    const card=document.createElement('div');card.className='card anim-fade-up';
+    card.style.animationDelay=i*0.06+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="topics" data-id="${d.id}" data-title="${esc(c.title)}">Темы</button>
-        <button class="btn ba btn-sm" data-action="caccess" data-id="${d.id}" data-title="${esc(c.title)}">Доступ студентов</button>
+        <button class="btn ba btn-sm" data-action="caccess" data-id="${d.id}" data-title="${esc(c.title)}">Доступ</button>
         <button class="btn bg btn-sm" data-action="delcourse" data-id="${d.id}">Удалить</button>
       </div>`;
     list.appendChild(card);
   });
 }
-
-// event delegation — один обработчик на весь список
-$('list-ac').addEventListener('click', async e=>{
-  const btn=e.target.closest('button[data-action]'); if(!btn) return;
-  const {action,id,title}=btn.dataset;
-  if(action==='topics')   { CID=id; $('lbl-course').textContent=title; await loadTopics(); show('screen-at'); }
-  if(action==='caccess')  { await openCourseAccess(id,title); }
-  if(action==='delcourse'){ if(!confirm('Удалить курс?'))return; await deleteDoc(doc(db,'courses',id)); toast('Удалён'); loadCourses(); }
+$('list-ac').addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-action]');if(!btn)return;
+  const{action,id,title}=btn.dataset;
+  if(action==='topics'){CID=id;$('lbl-course').textContent=title;await loadTopics();show('screen-at');}
+  if(action==='caccess'){await openCourseAccess(id,title);}
+  if(action==='delcourse'){if(!confirm('Удалить курс?'))return;await deleteDoc(doc(db,'courses',id));toast('Удалён');loadCourses();}
 });
-
 $('btnnc').onclick=()=>mshow('m-nc');
 $('nc-cancel').onclick=()=>mhide('m-nc');
 $('nc-save').onclick=async()=>{
-  const title=$('nc-title').value.trim(), desc=$('nc-desc').value.trim();
-  if(!title){ toast('Введи название','err'); return; }
+  const title=$('nc-title').value.trim(),desc=$('nc-desc').value.trim();
+  if(!title){toast('Введи название','err');return;}
   await addDoc(collection(db,'courses'),{title,description:desc,createdAt:serverTimestamp()});
-  mhide('m-nc'); $('nc-title').value=''; $('nc-desc').value='';
-  toast('Курс создан','ok'); loadCourses();
+  mhide('m-nc');$('nc-title').value='';$('nc-desc').value='';toast('Курс создан','ok');loadCourses();
 };
 
-// ═══════════════════════════════════════════════════════════════
-//  COURSE ACCESS
-// ═══════════════════════════════════════════════════════════════
+// ── Course access ──────────────────────────────────────────────
 async function openCourseAccess(courseId,courseTitle){
-  ACID=courseId; $('ca-name').textContent=courseTitle;
-  const [usersSnap,enrollSnap]=await Promise.all([
+  ACID=courseId;$('ca-name').textContent=courseTitle;
+  const[usersSnap,enrollSnap]=await Promise.all([
     getDocs(query(collection(db,'users'),where('role','==','student'))),
     getDocs(collection(db,'courses',courseId,'enrollments'))
   ]);
-  const enrolled=new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
-  const list=$('ca-list'); list.innerHTML='';
-  if(usersSnap.empty){ list.innerHTML='<p class="empty-msg">Студентов нет — создай пользователей.</p>'; mshow('m-ca'); return; }
-  usersSnap.forEach(d=>{
-    const u=d.data();
-    const grp=u.group?` <span class="grptag">${esc(u.group)}</span>`:'';
-    const row=document.createElement('div'); row.className='arow';
-    row.innerHTML=`<label class="albl"><input type="checkbox" data-uid="${d.id}" ${enrolled.has(d.id)?'checked':''}/><span class="aname">${esc(u.name||u.email)}${grp}</span><small>${esc(u.email)}</small></label>`;
-    list.appendChild(row);
-  });
+  const enrolled=new Set();enrollSnap.forEach(d=>enrolled.add(d.id));
+  const students=[];usersSnap.forEach(d=>students.push([d.id,d.data()]));
+  buildGroupTabs('ca-tabs','ca-list',students,enrolled,()=>true);
   mshow('m-ca');
 }
 $('ca-cancel').onclick=()=>mhide('m-ca');
 $('ca-save').onclick=async()=>{
   const cbs=[...$('ca-list').querySelectorAll('input[type=checkbox]')];
-  try{
-    await Promise.all(cbs.map(cb=>{
-      const r=doc(db,'courses',ACID,'enrollments',cb.dataset.uid);
-      return cb.checked?setDoc(r,{at:serverTimestamp()}):deleteDoc(r);
-    }));
-    toast('Доступ к курсу сохранён ✓','ok');
-  }catch(e){ toast('Ошибка: '+e.message,'err'); }
+  // Сохраняем только видимые чекбоксы (текущий фильтр)
+  // Сначала читаем все текущие enrolled, потом применяем изменения
+  const enrollSnap=await getDocs(collection(db,'courses',ACID,'enrollments'));
+  const currentEnrolled=new Set();enrollSnap.forEach(d=>currentEnrolled.add(d.id));
+  const ops=[];
+  cbs.forEach(cb=>{
+    const r=doc(db,'courses',ACID,'enrollments',cb.dataset.uid);
+    if(cb.checked&&!currentEnrolled.has(cb.dataset.uid))ops.push(setDoc(r,{at:serverTimestamp()}));
+    if(!cb.checked&&currentEnrolled.has(cb.dataset.uid))ops.push(deleteDoc(r));
+  });
+  try{await Promise.all(ops);toast('Доступ к курсу сохранён ✓','ok');}catch(e){toast('Ошибка: '+e.message,'err');}
   mhide('m-ca');
 };
 
 // ═══════════════════════════════════════════════════════════════
-//  TOPICS (ADMIN)
+//  TOPICS
 // ═══════════════════════════════════════════════════════════════
 async function loadTopics(){
   const snap=await getDocs(collection(db,'courses',CID,'topics'));
-  const list=$('list-at'); list.innerHTML='';
-  const topics=[]; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
+  const list=$('list-at');list.innerHTML='';
+  const topics=[];snap.forEach(d=>topics.push({id:d.id,...d.data()}));
   topics.sort((a,b)=>(a.order||0)-(b.order||0));
-  if(!topics.length){ list.innerHTML='<p class="empty-msg">Тем нет. Создай первую!</p>'; return; }
-  topics.forEach(t=>{
+  if(!topics.length){list.innerHTML='<p class="empty">Тем нет. Создай первую!</p>';return;}
+  topics.forEach((t,i)=>{
     const bc=(t.blocks||[]).length;
-    const card=document.createElement('div'); card.className='card';
+    const card=document.createElement('div');card.className='card anim-fade-up';
+    card.style.animationDelay=i*0.06+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${bc}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="edittopic" data-id="${t.id}">✏ Редактировать</button>
-        <button class="btn ba btn-sm" data-action="taccess"   data-id="${t.id}" data-title="${esc(t.title)}">🔓 Доступ</button>
-        <button class="btn bg btn-sm" data-action="deltopic"  data-id="${t.id}">Удалить</button>
+        <button class="btn ba btn-sm" data-action="taccess" data-id="${t.id}" data-title="${esc(t.title)}">🔓 Доступ</button>
+        <button class="btn bg btn-sm" data-action="deltopic" data-id="${t.id}">Удалить</button>
       </div>`;
     list.appendChild(card);
   });
 }
-
-$('list-at').addEventListener('click', async e=>{
-  const btn=e.target.closest('button[data-action]'); if(!btn) return;
-  const {action,id,title}=btn.dataset;
-  if(action==='edittopic'){ await openTopicEditor(id); }
-  if(action==='taccess')  { await openTopicAccess(id,title); }
-  if(action==='deltopic') { if(!confirm('Удалить тему?'))return; await deleteDoc(doc(db,'courses',CID,'topics',id)); toast('Удалено'); loadTopics(); }
+$('list-at').addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-action]');if(!btn)return;
+  const{action,id,title}=btn.dataset;
+  if(action==='edittopic'){await openTopicEditor(id);}
+  if(action==='taccess'){await openTopicAccess(id,title);}
+  if(action==='deltopic'){if(!confirm('Удалить тему?'))return;await deleteDoc(doc(db,'courses',CID,'topics',id));toast('Удалено');loadTopics();}
 });
-
-$('back-at').onclick=()=>{ loadCourses(); show('screen-ac'); };
-$('btnnt').onclick=()=>{
-  ETID=null; ECID=CID; EB=[];
-  $('te-title').value=''; $('te-order').value='0';
-  $('lbl-te').textContent='Новая тема';
-  renderEditor(); show('screen-te');
-};
+$('back-at').onclick=()=>{loadCourses();show('screen-ac');};
+$('btnnt').onclick=()=>{ETID=null;ECID=CID;EB=[];$('te-title').value='';$('te-order').value='0';$('lbl-te').textContent='Новая тема';renderEditor();show('screen-te');};
 
 async function openTopicEditor(topicId){
-  ETID=topicId; ECID=CID;
+  ETID=topicId;ECID=CID;
   const snap=await getDoc(doc(db,'courses',CID,'topics',topicId));
   const t=snap.data();
-  $('te-title').value=t.title||''; $('te-order').value=t.order||0;
+  $('te-title').value=t.title||'';$('te-order').value=t.order||0;
   $('lbl-te').textContent='Редактировать тему';
   EB=JSON.parse(JSON.stringify(t.blocks||[]));
-  renderEditor(); show('screen-te');
+  renderEditor();show('screen-te');
 }
-
-$('back-te').onclick=()=>{ loadTopics(); show('screen-at'); };
-$('cancel-te').onclick=()=>{ loadTopics(); show('screen-at'); };
+$('back-te').onclick=()=>{loadTopics();show('screen-at');};
+$('cancel-te').onclick=()=>{loadTopics();show('screen-at');};
 $('save-te').onclick=async()=>{
-  const title=$('te-title').value.trim();
-  if(!title){ toast('Введи название темы','err'); return; }
+  const title=$('te-title').value.trim();if(!title){toast('Введи название','err');return;}
   syncDOM();
   const data={title,order:parseInt($('te-order').value)||0,blocks:EB,updatedAt:serverTimestamp()};
   try{
-    if(ETID){ await updateDoc(doc(db,'courses',ECID,'topics',ETID),data); toast('Сохранено ✓','ok'); }
-    else     { data.createdAt=serverTimestamp(); await addDoc(collection(db,'courses',ECID,'topics'),data); toast('Создана ✓','ok'); }
-    CID=ECID; await loadTopics(); show('screen-at');
-  }catch(e){ toast('Ошибка: '+e.message,'err'); console.error(e); }
+    if(ETID){await updateDoc(doc(db,'courses',ECID,'topics',ETID),data);toast('Сохранено ✓','ok');}
+    else{data.createdAt=serverTimestamp();await addDoc(collection(db,'courses',ECID,'topics'),data);toast('Создана ✓','ok');}
+    CID=ECID;await loadTopics();show('screen-at');
+  }catch(e){toast('Ошибка: '+e.message,'err');console.error(e);}
 };
 
-// ── Редактор блоков ─────────────────────────────────────────
+// ── Block editor ───────────────────────────────────────────────
 function syncDOM(){
   EB.forEach((b,i)=>{
-    if(b.type==='text')     { const e=$('bc'+i); if(e) b.content=e.value; }
-    if(b.type==='image')    { const e=$('bi'+i); if(e) b.url=e.value.trim(); }
-    if(b.type==='video')    { const e=$('bv'+i); if(e) b.url=e.value.trim(); }
-    if(b.type==='question') { const e=$('bq'+i); if(e) b.question=e.value; }
+    if(b.type==='text'    ){const e=$('bc'+i);if(e)b.content=e.value;}
+    if(b.type==='image'   ){const e=$('bi'+i);if(e)b.url=e.value.trim();}
+    if(b.type==='video'   ){const e=$('bv'+i);if(e)b.url=e.value.trim();}
+    if(b.type==='question'){const e=$('bq'+i);if(e)b.question=e.value;}
   });
 }
-
-$('add-text').onclick=()=>{ syncDOM(); EB.push({type:'text',content:''}); renderEditor(); };
-$('add-img').onclick= ()=>{ syncDOM(); EB.push({type:'image',url:''}); renderEditor(); };
-$('add-vid').onclick= ()=>{ syncDOM(); EB.push({type:'video',url:''}); renderEditor(); };
-$('add-q').onclick=   ()=>{ syncDOM(); EB.push({type:'question',question:''}); renderEditor(); };
-
-$('blocks').addEventListener('click', e=>{
-  const btn=e.target.closest('button[data-baction]'); if(!btn) return;
-  const i=+btn.dataset.idx, a=btn.dataset.baction;
-  syncDOM();
-  if(a==='up')  { const b=EB.splice(i,1)[0]; EB.splice(i-1,0,b); renderEditor(); }
-  if(a==='dn')  { const b=EB.splice(i,1)[0]; EB.splice(i+1,0,b); renderEditor(); }
-  if(a==='del') { if(!confirm('Удалить блок?'))return; EB.splice(i,1); renderEditor(); }
+$('add-text').onclick=()=>{syncDOM();EB.push({type:'text',content:''});renderEditor();};
+$('add-img').onclick= ()=>{syncDOM();EB.push({type:'image',url:''});renderEditor();};
+$('add-vid').onclick= ()=>{syncDOM();EB.push({type:'video',url:''});renderEditor();};
+$('add-q').onclick=   ()=>{syncDOM();EB.push({type:'question',question:''});renderEditor();};
+$('blocks').addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-baction]');if(!btn)return;
+  const i=+btn.dataset.idx,a=btn.dataset.baction;syncDOM();
+  if(a==='up'){const b=EB.splice(i,1)[0];EB.splice(i-1,0,b);}
+  if(a==='dn'){const b=EB.splice(i,1)[0];EB.splice(i+1,0,b);}
+  if(a==='del'){if(!confirm('Удалить блок?'))return;EB.splice(i,1);}
+  renderEditor();
 });
-
 function renderEditor(){
-  const c=$('blocks'); c.innerHTML='';
-  if(!EB.length){ c.innerHTML='<p class="empty-msg">Нет блоков. Добавь кнопками выше.</p>'; return; }
+  const c=$('blocks');c.innerHTML='';
+  if(!EB.length){c.innerHTML='<p class="empty">Нет блоков. Добавь кнопками выше.</p>';return;}
   EB.forEach((b,i)=>{
-    const w=document.createElement('div'); w.className='bwrap';
+    const w=document.createElement('div');w.className='bwrap';w.style.animationDelay=i*0.04+'s';
     const nm=b.type==='text'?'📝 Текст':b.type==='image'?'🖼 Картинка':b.type==='video'?'▶ Видео':'❓ Вопрос';
     let body='';
-    if(b.type==='text'){
-      body=`<textarea id="bc${i}" class="bta" placeholder="Введи текст...">${esc(b.content||'')}</textarea>`;
-    } else if(b.type==='image'){
-      body=`<label class="blbl">Прямая ссылка на картинку</label>
-        <input id="bi${i}" type="url" class="binp" value="${esc(b.url||'')}" placeholder="https://i.imgur.com/example.jpg"/>
-        <p class="bhint">Загрузи картинку на <a href="https://imgbb.com" target="_blank">imgbb.com</a> или <a href="https://imgur.com" target="_blank">imgur.com</a> — скопируй прямую ссылку.</p>
-        ${b.url?`<img class="bprev" src="${esc(b.url)}" onerror="this.style.display='none'"/>`:''}`;
-    } else if(b.type==='video'){
-      body=`<label class="blbl">Ссылка или &lt;iframe&gt; код</label>
-        <textarea id="bv${i}" class="bta bta-sm" placeholder="YouTube: https://youtube.com/watch?v=...\nВКонтакте: https://vkvideo.ru/video-123_456\nИли вставь &lt;iframe ...&gt; код целиком">${esc(b.url||'')}</textarea>
-        <p class="bhint">YouTube и ВКонтакте встраиваются автоматически. Также поддерживается iframe-код и прямые .mp4 ссылки.</p>`;
-    } else if(b.type==='question'){
-      body=`<label class="blbl">Вопрос для студента</label>
-        <textarea id="bq${i}" class="bta bta-sm" placeholder="Напиши вопрос...">${esc(b.question||'')}</textarea>`;
-    }
-    w.innerHTML=`<div class="bhdr">
-        <span class="btype">${nm}</span>
-        <div class="bbtns">
-          ${i>0?`<button class="xbtn" data-baction="up" data-idx="${i}">↑</button>`:''}
-          ${i<EB.length-1?`<button class="xbtn" data-baction="dn" data-idx="${i}">↓</button>`:''}
-          <button class="xbtn xdel" data-baction="del" data-idx="${i}">✕</button>
-        </div>
-      </div>
-      <div class="bbody">${body}</div>`;
+    if(b.type==='text')     body=`<textarea id="bc${i}" class="bta" placeholder="Введи текст...">${esc(b.content||'')}</textarea>`;
+    else if(b.type==='image')body=`<label class="blbl">Прямая ссылка на картинку</label>
+      <input id="bi${i}" type="url" class="binp" value="${esc(b.url||'')}" placeholder="https://i.imgur.com/example.jpg"/>
+      <p class="bhint">Загрузи на <a href="https://imgbb.com" target="_blank">imgbb.com</a> или <a href="https://imgur.com" target="_blank">imgur.com</a> — скопируй прямую ссылку.</p>
+      ${b.url?`<img class="bprev" src="${esc(b.url)}" onerror="this.style.display='none'"/>`:''}`; 
+    else if(b.type==='video')body=`<label class="blbl">Ссылка или &lt;iframe&gt; код</label>
+      <textarea id="bv${i}" class="bta bta-sm" placeholder="YouTube: https://youtube.com/watch?v=...\nВКонтакте: https://vkvideo.ru/video-123_456\nИли вставь &lt;iframe ...&gt; целиком">${esc(b.url||'')}</textarea>
+      <p class="bhint">YouTube и ВКонтакте встраиваются автоматически. Поддерживается iframe-код и прямые .mp4 ссылки.</p>`;
+    else body=`<label class="blbl">Вопрос для студента</label>
+      <textarea id="bq${i}" class="bta bta-sm" placeholder="Напиши вопрос...">${esc(b.question||'')}</textarea>`;
+    w.innerHTML=`<div class="bhdr"><span class="btype">${nm}</span>
+      <div class="bbtns">
+        ${i>0?`<button class="xbtn" data-baction="up" data-idx="${i}">↑</button>`:''}
+        ${i<EB.length-1?`<button class="xbtn" data-baction="dn" data-idx="${i}">↓</button>`:''}
+        <button class="xbtn xdel" data-baction="del" data-idx="${i}">✕</button>
+      </div></div><div class="bbody">${body}</div>`;
     c.appendChild(w);
   });
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  TOPIC ACCESS
-// ═══════════════════════════════════════════════════════════════
+// ── Topic access ───────────────────────────────────────────────
 async function openTopicAccess(topicId,topicTitle){
-  ATID=topicId; $('ta-name').textContent=topicTitle;
-  const [enrollSnap,accessSnap,usersSnap]=await Promise.all([
+  ATID=topicId;$('ta-name').textContent=topicTitle;
+  const[enrollSnap,accessSnap,usersSnap]=await Promise.all([
     getDocs(collection(db,'courses',CID,'enrollments')),
     getDocs(collection(db,'courses',CID,'topics',topicId,'access')),
     getDocs(query(collection(db,'users'),where('role','==','student')))
   ]);
-  const enrolled=new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
-  const allowed =new Set(); accessSnap.forEach(d=>allowed.add(d.id));
-  const list=$('ta-list'); list.innerHTML='';
+  const enrolled=new Set();enrollSnap.forEach(d=>enrolled.add(d.id));
+  const allowed=new Set();accessSnap.forEach(d=>allowed.add(d.id));
   if(!enrolled.size){
-    list.innerHTML='<p class="empty-msg">На этот курс никто не записан.<br/>Сначала открой "Доступ студентов" у курса.</p>';
-    mshow('m-ta'); return;
+    $('ta-tabs').innerHTML='';$('ta-list').innerHTML='<p class="empty">На этот курс никто не записан.<br/>Сначала открой "Доступ" у курса.</p>';
+    mshow('m-ta');return;
   }
-  let shown=0;
-  usersSnap.forEach(d=>{
-    if(!enrolled.has(d.id)) return;
-    shown++;
-    const u=d.data();
-    const grp=u.group?` <span class="grptag">${esc(u.group)}</span>`:'';
-    const row=document.createElement('div'); row.className='arow';
-    row.innerHTML=`<label class="albl"><input type="checkbox" data-uid="${d.id}" ${allowed.has(d.id)?'checked':''}/><span class="aname">${esc(u.name||u.email)}${grp}</span><small>${esc(u.email)}</small></label>`;
-    list.appendChild(row);
-  });
-  if(!shown) list.innerHTML='<p class="empty-msg">Нет студентов записанных на этот курс.</p>';
+  const students=[];usersSnap.forEach(d=>{if(enrolled.has(d.id))students.push([d.id,d.data()]);});
+  buildGroupTabs('ta-tabs','ta-list',students,allowed,uid=>enrolled.has(uid));
   mshow('m-ta');
 }
 $('ta-cancel').onclick=()=>mhide('m-ta');
 $('ta-save').onclick=async()=>{
   const cbs=[...$('ta-list').querySelectorAll('input[type=checkbox]')];
-  try{
-    await Promise.all(cbs.map(cb=>{
-      const r=doc(db,'courses',CID,'topics',ATID,'access',cb.dataset.uid);
-      return cb.checked?setDoc(r,{at:serverTimestamp()}):deleteDoc(r);
-    }));
-    toast('Доступ к теме сохранён ✓','ok');
-  }catch(e){ toast('Ошибка: '+e.message,'err'); }
+  const accessSnap=await getDocs(collection(db,'courses',CID,'topics',ATID,'access'));
+  const cur=new Set();accessSnap.forEach(d=>cur.add(d.id));
+  const ops=[];
+  cbs.forEach(cb=>{
+    const r=doc(db,'courses',CID,'topics',ATID,'access',cb.dataset.uid);
+    if(cb.checked&&!cur.has(cb.dataset.uid))ops.push(setDoc(r,{at:serverTimestamp()}));
+    if(!cb.checked&&cur.has(cb.dataset.uid))ops.push(deleteDoc(r));
+  });
+  try{await Promise.all(ops);toast('Доступ к теме сохранён ✓','ok');}catch(e){toast('Ошибка: '+e.message,'err');}
   mhide('m-ta');
 };
 
 // ═══════════════════════════════════════════════════════════════
-//  USERS + GROUPS
+//  USERS
 // ═══════════════════════════════════════════════════════════════
 async function loadUsers(){
   const snap=await getDocs(collection(db,'users'));
-  const list=$('list-au'); list.innerHTML='';
-  if(snap.empty){ list.innerHTML='<p class="empty-msg">Пользователей нет</p>'; return; }
-  snap.forEach(d=>{
-    const u=d.data();
-    const rl=u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
-    const grp=u.group?` <span class="grptag">${esc(u.group)}</span>`:'';
-    const card=document.createElement('div'); card.className='card';
-    card.innerHTML=`<div class="ci"><h3>${esc(u.name||'—')}</h3>
-        <p>${esc(u.email)} · <span class="rbadge r${u.role[0]}">${rl}</span>${grp}</p>
-      </div>
-      <div class="ca">
-        <button class="btn bs btn-sm" data-action="edituser" data-id="${d.id}">✏ Изменить</button>
-        <button class="btn bg btn-sm" data-action="deluser"  data-id="${d.id}">Удалить</button>
-      </div>`;
-    list.appendChild(card);
-  });
+  const list=$('list-au');list.innerHTML='';
+  let all=[];snap.forEach(d=>all.push({id:d.id,...d.data()}));
+  all.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  function render(filter=''){
+    list.innerHTML='';
+    const f=filter.toLowerCase();
+    all.forEach((u,i)=>{
+      if(f&&!((u.name||'').toLowerCase().includes(f)||(u.email||'').toLowerCase().includes(f)))return;
+      const rl=u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
+      const grp=u.groupName?` <span class="grptag">${esc(u.groupName)}</span>`:'';
+      const card=document.createElement('div');card.className='card anim-fade-up';
+      card.style.animationDelay=i*0.04+'s';
+      card.innerHTML=`<div class="ci"><h3>${esc(u.name||'—')}</h3>
+        <p>${esc(u.email)} · <span class="rbadge r${u.role[0]}">${rl}</span>${grp}</p></div>
+        <div class="ca">
+          <button class="btn bs btn-sm" data-action="edituser" data-id="${u.id}">✏ Изменить</button>
+          <button class="btn bw btn-sm" data-action="resetpw"  data-id="${u.id}" data-name="${esc(u.name||u.email)}">🔑 Пароль</button>
+          <button class="btn bg btn-sm" data-action="deluser"  data-id="${u.id}">Удалить</button>
+        </div>`;
+      list.appendChild(card);
+    });
+  }
+  render();
+  $('usearch').oninput=function(){render(this.value);};
 }
 
-$('list-au').addEventListener('click', async e=>{
-  const btn=e.target.closest('button[data-action]'); if(!btn) return;
-  const {action,id}=btn.dataset;
-  if(action==='edituser'){ await openEditUser(id); }
+$('list-au').addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-action]');if(!btn)return;
+  const{action,id,name}=btn.dataset;
+  if(action==='edituser'){await openEditUser(id);}
+  if(action==='resetpw') {RUID=id;RUNAME=name;$('rp-name').textContent=name;$('rp-pass').value='';mshow('m-rp');}
   if(action==='deluser') {
-    if(!confirm('Удалить из базы? Учётная запись в Firebase Auth останется — удали её вручную.'))return;
-    await deleteDoc(doc(db,'users',id)); toast('Удалён'); loadUsers();
+    if(!confirm('Удалить из базы?'))return;
+    await deleteDoc(doc(db,'users',id));toast('Удалён');loadUsers();
   }
 });
 
 async function openEditUser(uid){
   EUID=uid;
-  const snap=await getDoc(doc(db,'users',uid)); const u=snap.data();
+  const snap=await getDoc(doc(db,'users',uid));const u=snap.data();
   $('nu-title').textContent='Редактировать пользователя';
-  $('nu-name').value=u.name||''; $('nu-email').value=u.email||'';
-  $('nu-role').value=u.role||'student'; $('nu-group').value=u.group||'';
-  $('nu-pass-wrap').classList.add('hidden'); // при редактировании пароль не меняем
+  $('nu-name').value=u.name||'';$('nu-email').value=u.email||'';
+  $('nu-role').value=u.role||'student';
+  fillGroupSelect();$('nu-group').value=u.groupId||'';
+  $('nu-pwrap').classList.add('hidden');
   mshow('m-nu');
 }
 
 $('btnnu').onclick=()=>{
-  EUID=null;
-  $('nu-title').textContent='Новый пользователь';
-  $('nu-name').value=''; $('nu-email').value=''; $('nu-pass').value='';
-  $('nu-role').value='student'; $('nu-group').value='';
-  $('nu-pass-wrap').classList.remove('hidden');
-  mshow('m-nu');
+  EUID=null;$('nu-title').textContent='Новый пользователь';
+  $('nu-name').value='';$('nu-email').value='';$('nu-pass').value='';
+  $('nu-role').value='student';fillGroupSelect();$('nu-group').value='';
+  $('nu-pwrap').classList.remove('hidden');mshow('m-nu');
 };
-$('nu-cancel').onclick=()=>{ mhide('m-nu'); EUID=null; $('nu-pass-wrap').classList.remove('hidden'); };
-
+$('nu-cancel').onclick=()=>{mhide('m-nu');EUID=null;$('nu-pwrap').classList.remove('hidden');};
 $('nu-save').onclick=async()=>{
-  const name=$('nu-name').value.trim(), email=$('nu-email').value.trim(),
-        pass=$('nu-pass').value,          role=$('nu-role').value,
-        group=$('nu-group').value.trim();
-
+  const name=$('nu-name').value.trim(),email=$('nu-email').value.trim(),
+        pass=$('nu-pass').value,role=$('nu-role').value,
+        groupId=$('nu-group').value,
+        groupName=GROUPS.find(g=>g.id===groupId)?.name||'';
   if(EUID){
-    // Редактирование существующего
-    if(!name){ toast('Введи имя','err'); return; }
-    const upd={name,role,email};
-    if(group) upd.group=group; else upd.group='';
-    await updateDoc(doc(db,'users',EUID),upd);
-    toast('Сохранено ✓','ok'); mhide('m-nu'); EUID=null;
-    $('nu-pass-wrap').classList.remove('hidden'); loadUsers();
-    return;
+    if(!name){toast('Введи имя','err');return;}
+    await updateDoc(doc(db,'users',EUID),{name,role,email,groupId,groupName});
+    toast('Сохранено ✓','ok');mhide('m-nu');EUID=null;$('nu-pwrap').classList.remove('hidden');loadUsers();return;
   }
-  // Создание нового
-  if(!name||!email||!pass){ toast('Заполни имя, email и пароль','err'); return; }
+  if(!name||!email||!pass){toast('Заполни имя, email и пароль','err');return;}
   try{
     const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({email,password:pass,returnSecureToken:false})
     });
     const data=await res.json();
-    if(data.error){ toast('Firebase: '+data.error.message,'err'); return; }
-    const profile={name,email,role,createdAt:serverTimestamp()};
-    if(group) profile.group=group;
-    await setDoc(doc(db,'users',data.localId),profile);
-    toast('Пользователь создан ✓','ok'); mhide('m-nu'); loadUsers();
-  }catch(e){ toast('Ошибка: '+e.message,'err'); }
+    if(data.error){toast('Firebase: '+data.error.message,'err');return;}
+    await setDoc(doc(db,'users',data.localId),{name,email,role,groupId,groupName,createdAt:serverTimestamp()});
+    toast('Пользователь создан ✓','ok');mhide('m-nu');loadUsers();
+  }catch(e){toast('Ошибка: '+e.message,'err');}
+};
+
+// ── Reset password ─────────────────────────────────────────────
+$('rp-cancel').onclick=()=>mhide('m-rp');
+$('rp-save').onclick=async()=>{
+  const newPass=$('rp-pass').value;
+  if(!newPass||newPass.length<6){toast('Пароль минимум 6 символов','err');return;}
+  // Сброс через Firebase Auth REST API
+  try{
+    // Получаем idToken через signIn с email — нет прямого способа поменять чужой пароль без Admin SDK
+    // Используем updatePassword через обновление пользователя напрямую — только через Admin SDK
+    // В браузере без Admin SDK можно только отправить email для сброса пароля
+    // Отправляем письмо сброса пароля на email пользователя
+    const snap=await getDoc(doc(db,'users',RUID));
+    const email=snap.data().email;
+    const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({requestType:'PASSWORD_RESET',email})
+    });
+    const data=await res.json();
+    if(data.error){toast('Ошибка: '+data.error.message,'err');return;}
+    toast(`Письмо для сброса пароля отправлено на ${email} ✓`,'ok');
+    mhide('m-rp');
+  }catch(e){toast('Ошибка: '+e.message,'err');}
 };
 
 // ═══════════════════════════════════════════════════════════════
-//  ANSWERS + GRADES (TEACHER/ADMIN)
+//  ANSWERS + CUSTOM GRADES
 // ═══════════════════════════════════════════════════════════════
 async function loadAnswers(){
   const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
-  const list=$('list-ta'); list.innerHTML='';
-  if(snap.empty){ list.innerHTML='<p class="empty-msg">Ответов нет</p>'; return; }
-  snap.forEach(d=>{
+  const list=$('list-ta');list.innerHTML='';
+  if(snap.empty){list.innerHTML='<p class="empty">Ответов нет</p>';return;}
+  snap.forEach((d,i)=>{
     const a=d.data();
     const sc=a.status==='checked'?'schk':'spend';
     const sl=a.status==='checked'?'✅ Проверено':'⏳ На проверке';
-    const gh=a.grade?`<span class="gbadge ${gc(a.grade)}">${esc(a.grade)}</span>`:'';
-    const card=document.createElement('div'); card.className='card acard';
+    const savedGrade=GRADES.find(g=>g.id===a.gradeId);
+    const gh=savedGrade?gradeChip(savedGrade):'';
+    const card=document.createElement('div');card.className='card acard anim-fade-up';
+    card.style.animationDelay=i*0.04+'s';
+
+    // Build grade options
+    const gradeOpts=GRADES.map(g=>`<option value="${g.id}" ${a.gradeId===g.id?'selected':''}>${esc(g.label)}</option>`).join('');
+
     card.innerHTML=`
       <div class="ahdr">
         <div><strong>${esc(a.studentName||a.studentEmail)}</strong>
@@ -791,13 +1162,13 @@ async function loadAnswers(){
         <div class="qablock"><p class="qt">Вопрос ${i+1}: ${esc((a.questions||[])[i]||'')}</p><p class="at">${esc(ans)}</p></div>`).join('')}
       </div>
       <div class="fbrow">
-        <div class="fbl"><label class="slabel">Оценка</label>
-          <select class="gsel" id="gs${d.id}">
-            <option value="">— —</option>
-            ${['A','A-','B+','B','B-','C+','C','C-','D','F'].map(g=>`<option ${a.grade===g?'selected':''}>${g}</option>`).join('')}
+        <div class="fbl"><label class="slbl">Оценка</label>
+          <select id="gs${d.id}">
+            <option value="">— без оценки —</option>
+            ${gradeOpts}
           </select>
         </div>
-        <div class="fbr"><label class="slabel">Комментарий</label>
+        <div class="fbr"><label class="slbl">Комментарий</label>
           <textarea class="fbinp" id="fb${d.id}" placeholder="Комментарий...">${esc(a.feedback||'')}</textarea>
         </div>
         <button class="btn bp fbbtn" data-aid="${d.id}">Сохранить</button>
@@ -805,107 +1176,119 @@ async function loadAnswers(){
     list.appendChild(card);
   });
 }
-
-$('list-ta').addEventListener('click', async e=>{
-  const btn=e.target.closest('button[data-aid]'); if(!btn) return;
+$('list-ta').addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-aid]');if(!btn)return;
   const id=btn.dataset.aid;
-  const feedback=$('fb'+id).value, grade=$('gs'+id).value;
-  await updateDoc(doc(db,'answers',id),{feedback,grade,status:'checked',checkedAt:serverTimestamp(),checkedBy:CU.uid});
-  toast('Сохранено ✓','ok'); loadAnswers();
+  const gradeId=$('gs'+id).value;
+  const gradeLabel=GRADES.find(g=>g.id===gradeId)?.label||'';
+  const feedback=$('fb'+id).value;
+  await updateDoc(doc(db,'answers',id),{feedback,gradeId,gradeLabel,status:'checked',checkedAt:serverTimestamp(),checkedBy:CU.uid});
+  toast('Сохранено ✓','ok');
+  // Анимация кнопки
+  btn.textContent='✓'; setTimeout(()=>{btn.textContent='Сохранить';},1500);
+  loadAnswers();
 });
-
 $('asearch').addEventListener('input',function(){
   const q=this.value.toLowerCase();
   document.querySelectorAll('.acard').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
 });
 
+// ── Grades journal ──────────────────────────────────────────────
 async function loadGrades(){
   const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
-  const list=$('list-gj'); list.innerHTML=''; const by={};
-  snap.forEach(d=>{ const a=d.data(); if(!a.grade)return; const n=a.studentName||a.studentEmail; (by[n]=by[n]||[]).push(a); });
-  if(!Object.keys(by).length){ list.innerHTML='<p class="empty-msg">Оценок нет</p>'; return; }
-  Object.entries(by).forEach(([name,entries])=>{
-    const sec=document.createElement('div'); sec.className='gsec';
+  const list=$('list-gj');list.innerHTML='';const by={};
+  snap.forEach(d=>{const a=d.data();if(!a.gradeId)return;const n=a.studentName||a.studentEmail;(by[n]=by[n]||[]).push(a);});
+  if(!Object.keys(by).length){list.innerHTML='<p class="empty">Оценок нет</p>';return;}
+  Object.entries(by).forEach(([name,entries],si)=>{
+    const sec=document.createElement('div');sec.className='gsec';sec.style.animationDelay=si*0.07+'s';
     sec.innerHTML=`<h3 class="gname">${esc(name)}</h3>`;
     entries.forEach(a=>{
-      const row=document.createElement('div'); row.className='grow';
-      row.innerHTML=`<span class="gtopic">${esc(a.topicTitle||'—')}</span><span class="muted">${fmt(a.checkedAt)}</span><span class="gbadge ${gc(a.grade)}">${esc(a.grade)}</span>`;
+      const g=GRADES.find(x=>x.id===a.gradeId);
+      const row=document.createElement('div');row.className='grow';
+      row.innerHTML=`<span class="gtopic">${esc(a.topicTitle||'—')}</span>
+        <span class="muted">${fmt(a.checkedAt)}</span>
+        ${g?gradeChip(g):''}`;
       sec.appendChild(row);
-    }); list.appendChild(sec);
+    });
+    list.appendChild(sec);
   });
 }
 
 async function loadMyGrades(){
   const snap=await getDocs(query(collection(db,'answers'),where('studentId','==',CU.uid),orderBy('createdAt','desc')));
-  const list=$('list-mg'); list.innerHTML=''; let any=false;
-  snap.forEach(d=>{ const a=d.data(); if(!a.grade)return; any=true;
-    const row=document.createElement('div'); row.className='card';
-    row.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3><p class="muted">${fmt(a.checkedAt)}</p>${a.feedback?`<p class="gfb">💬 ${esc(a.feedback)}</p>`:''}</div><span class="gbadge gbig ${gc(a.grade)}">${esc(a.grade)}</span>`;
-    list.appendChild(row);
+  const list=$('list-mg');list.innerHTML='';let any=false;
+  snap.forEach((d,i)=>{
+    const a=d.data();if(!a.gradeId)return;any=true;
+    const g=GRADES.find(x=>x.id===a.gradeId);
+    const card=document.createElement('div');card.className='card anim-fade-up';card.style.animationDelay=i*0.05+'s';
+    card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
+      <p class="muted">${fmt(a.checkedAt)}</p>
+      ${a.feedback?`<p class="gfb">💬 ${esc(a.feedback)}</p>`:''}</div>
+      ${g?gradeChip(g,true):''}`;
+    list.appendChild(card);
   });
-  if(!any) list.innerHTML='<p class="empty-msg">Оценок нет</p>';
+  if(!any)list.innerHTML='<p class="empty">Оценок нет</p>';
 }
 
 // ═══════════════════════════════════════════════════════════════
-//  STUDENT — COURSES / TOPICS / TOPIC VIEW
+//  STUDENT COURSES / TOPICS / TOPIC VIEW
 // ═══════════════════════════════════════════════════════════════
 async function loadMyCourses(){
   const allSnap=await getDocs(collection(db,'courses'));
-  const list=$('list-sc'); list.innerHTML=''; const visible=[];
+  const list=$('list-sc');list.innerHTML='';list.innerHTML='<div class="skeleton"></div><div class="skeleton"></div>';
+  const visible=[];
   for(const d of allSnap.docs){
     const e=await getDoc(doc(db,'courses',d.id,'enrollments',CU.uid));
-    if(e.exists()) visible.push({id:d.id,...d.data()});
+    if(e.exists())visible.push({id:d.id,...d.data()});
   }
-  if(!visible.length){ list.innerHTML='<p class="empty-msg">Тебе пока не открыт доступ ни к одному курсу</p>'; return; }
-  visible.forEach(c=>{
-    const card=document.createElement('div'); card.className='card clk';
+  list.innerHTML='';
+  if(!visible.length){list.innerHTML='<p class="empty">Тебе пока не открыт доступ ни к одному курсу</p>';return;}
+  visible.forEach((c,i)=>{
+    const card=document.createElement('div');card.className='card clk anim-fade-up';card.style.animationDelay=i*0.07+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div><div class="carrow">→</div>`;
     card.addEventListener('click',()=>openCourse(c.id,c.title));
     list.appendChild(card);
   });
 }
-
 async function openCourse(courseId,courseTitle){
-  CID=courseId; $('lbl-sc').textContent=courseTitle;
-  await loadMyTopics(courseId); show('screen-st');
+  CID=courseId;$('lbl-sc').textContent=courseTitle;
+  await loadMyTopics(courseId);show('screen-st');
 }
-
 async function loadMyTopics(courseId){
   const snap=await getDocs(collection(db,'courses',courseId,'topics'));
-  const list=$('list-st'); list.innerHTML='';
-  const topics=[]; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
+  const list=$('list-st');list.innerHTML='';
+  const topics=[];snap.forEach(d=>topics.push({id:d.id,...d.data()}));
   topics.sort((a,b)=>(a.order||0)-(b.order||0));
   for(const t of topics){
     const aSnap=await getDoc(doc(db,'courses',courseId,'topics',t.id,'access',CU.uid));
     const ok=aSnap.exists();
     const qc=(t.blocks||[]).filter(b=>b.type==='question').length;
-    const card=document.createElement('div'); card.className=`card ${ok?'clk':'locked'}`;
-    card.innerHTML=`<div class="licon">${ok?'📖':'🔒'}</div><div class="ci"><h3>${esc(t.title)}</h3><p>${ok?(qc?`${qc} вопрос(а)`:'Материал для изучения'):'Заблокировано'}</p></div>`;
-    if(ok) card.addEventListener('click',()=>openTopicView(t));
+    const card=document.createElement('div');card.className=`card ${ok?'clk':'locked'} anim-fade-up`;
+    card.innerHTML=`<div class="licon">${ok?'📖':'🔒'}</div>
+      <div class="ci"><h3>${esc(t.title)}</h3>
+      <p>${ok?(qc?`${qc} вопрос(а)`:'Материал для изучения'):'Заблокировано'}</p></div>`;
+    if(ok)card.addEventListener('click',()=>openTopicView(t));
     list.appendChild(card);
   }
 }
-
 async function openTopicView(topic){
   $('lbl-sv').textContent=topic.title;
   const prevSnap=await getDocs(query(collection(db,'answers'),where('studentId','==',CU.uid),where('topicId','==',topic.id)));
-  let prev=null; prevSnap.forEach(d=>prev=d.data());
-
-  const cont=$('topic-content'); cont.innerHTML='';
+  let prev=null;prevSnap.forEach(d=>prev=d.data());
+  const cont=$('topic-content');cont.innerHTML='';
   const qblocks=[];
-
   (topic.blocks||[]).forEach(block=>{
-    const el=document.createElement('div'); el.className='tblock';
+    const el=document.createElement('div');el.className='tblock';
     if(block.type==='text'){
       el.innerHTML=`<div class="ttext">${(block.content||'').replace(/\n/g,'<br/>')}</div>`;
     } else if(block.type==='image'){
       const u=(block.url||'').trim();
-      if(u) el.innerHTML=`<img class="timg" src="${esc(u)}" alt="Изображение"
+      if(u)el.innerHTML=`<img class="timg" src="${esc(u)}" alt="Изображение"
         onerror="this.outerHTML='<div class=imgerr>⚠ Изображение не загружается. <a href=&quot;${esc(u)}&quot; target=&quot;_blank&quot;>Открыть ссылку</a></div>'"/>`;
     } else if(block.type==='video'){
       el.appendChild(buildEmbed(block.url||''));
     } else if(block.type==='question'){
-      const qi=qblocks.length; qblocks.push(block);
+      const qi=qblocks.length;qblocks.push(block);
       if(prev){
         el.innerHTML=`<div class="qblock"><p class="qlbl">❓ ${esc(block.question)}</p>
           <div class="pans">${esc((prev.answers||[])[qi]||'—')}</div></div>`;
@@ -916,16 +1299,17 @@ async function openTopicView(topic){
     }
     cont.appendChild(el);
   });
-
-  const st=$('topic-status'); st.innerHTML='';
+  const st=$('topic-status');st.innerHTML='';
   if(qblocks.length){
     if(prev?.status==='checked'){
-      const gh=prev.grade?`<span class="gbadge ${gc(prev.grade)}">${esc(prev.grade)}</span>`:'';
-      st.innerHTML=`<div class="fbok"><h4>✅ Ответ проверен ${gh}</h4><p>${prev.feedback?esc(prev.feedback):'Комментарий не добавлен'}</p></div>`;
+      const g=GRADES.find(x=>x.id===prev.gradeId);
+      const gh=g?gradeChip(g,true):'';
+      st.innerHTML=`<div class="fbok"><h4>✅ Ответ проверен ${gh}</h4>
+        <p>${prev.feedback?esc(prev.feedback):'Комментарий не добавлен'}</p></div>`;
     } else if(prev?.status==='pending'){
       st.innerHTML=`<div class="fbwait">⏳ Ответ отправлен на проверку</div>`;
     } else {
-      const btn=document.createElement('button'); btn.className='btn bp bsubmit';
+      const btn=document.createElement('button');btn.className='btn bsubmit';
       btn.textContent='Отправить ответы на проверку';
       btn.addEventListener('click',()=>submitAnswers(topic,qblocks));
       st.appendChild(btn);
@@ -933,47 +1317,38 @@ async function openTopicView(topic){
   }
   show('screen-sv');
 }
-
 function buildEmbed(raw){
   const wrap=document.createElement('div');
-  const u=raw.trim(); if(!u){ wrap.classList.add('hidden'); return wrap; }
-  // Готовый iframe
+  const u=raw.trim();if(!u){wrap.classList.add('hidden');return wrap;}
   if(u.startsWith('<iframe')){
-    wrap.className='vifwrap'; wrap.innerHTML=u;
+    wrap.className='vifwrap';wrap.innerHTML=u;
     const f=wrap.querySelector('iframe');
-    if(f){ f.style.width='100%'; f.style.height='360px'; f.removeAttribute('width'); f.removeAttribute('height'); }
+    if(f){f.style.width='100%';f.style.height='360px';f.removeAttribute('width');f.removeAttribute('height');}
     return wrap;
   }
   wrap.className='vwrap';
-  // YouTube
   const yt=u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/);
-  if(yt){ wrap.innerHTML=`<iframe src="https://www.youtube.com/embed/${yt[1]}" frameborder="0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>`; return wrap; }
-  // VK
+  if(yt){wrap.innerHTML=`<iframe src="https://www.youtube.com/embed/${yt[1]}" frameborder="0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen></iframe>`;return wrap;}
   const vk=u.match(/video(-?\d+)_(\d+)/);
-  if(vk){ wrap.innerHTML=`<iframe src="https://vk.com/video_ext.php?oid=${vk[1]}&id=${vk[2]}&hd=2" frameborder="0" allow="autoplay;encrypted-media;fullscreen;picture-in-picture" allowfullscreen></iframe>`; return wrap; }
-  // mp4
-  if(u.match(/\.(mp4|webm|ogg)(\?|$)/i)){ wrap.innerHTML=`<video controls><source src="${esc(u)}"/></video>`; return wrap; }
-  // fallback
-  wrap.className=''; wrap.innerHTML=`<div class="vlink"><div class="vlico">▶</div><a class="btn bp" href="${esc(u)}" target="_blank">Открыть видео</a></div>`;
+  if(vk){wrap.innerHTML=`<iframe src="https://vk.com/video_ext.php?oid=${vk[1]}&id=${vk[2]}&hd=2" frameborder="0" allow="autoplay;encrypted-media;fullscreen;picture-in-picture" allowfullscreen></iframe>`;return wrap;}
+  if(u.match(/\.(mp4|webm|ogg)(\?|$)/i)){wrap.innerHTML=`<video controls><source src="${esc(u)}"/></video>`;return wrap;}
+  wrap.className='';wrap.innerHTML=`<div class="vlink"><div class="vlico">▶</div><a class="btn bp" href="${esc(u)}" target="_blank">Открыть видео</a></div>`;
   return wrap;
 }
-
 async function submitAnswers(topic,qblocks){
   const tas=document.querySelectorAll('#topic-content textarea.ata');
   const answers=[...tas].map(t=>t.value.trim());
-  if(answers.some(a=>!a)){ toast('Ответь на все вопросы','err'); return; }
+  if(answers.some(a=>!a)){toast('Ответь на все вопросы','err');return;}
   await addDoc(collection(db,'answers'),{
-    studentId:CU.uid, studentEmail:CU.email, studentName:UP.name||CU.email,
-    courseId:CID, topicId:topic.id, topicTitle:topic.title,
-    questions:qblocks.map(b=>b.question), answers,
-    status:'pending', grade:'', createdAt:serverTimestamp()
+    studentId:CU.uid,studentEmail:CU.email,studentName:UP.name||CU.email,
+    courseId:CID,topicId:topic.id,topicTitle:topic.title,
+    questions:qblocks.map(b=>b.question),answers,
+    status:'pending',gradeId:'',gradeLabel:'',feedback:'',createdAt:serverTimestamp()
   });
-  toast('Ответы отправлены ✓','ok'); openTopicView(topic);
+  toast('Ответы отправлены ✓','ok');openTopicView(topic);
 }
-
-$('back-st').onclick=()=>{ loadMyCourses(); show('screen-sc'); };
-$('back-sv').onclick=()=>{ openCourse(CID,$('lbl-sc').textContent); };
-
+$('back-st').onclick=()=>{loadMyCourses();show('screen-sc');};
+$('back-sv').onclick=()=>{openCourse(CID,$('lbl-sc').textContent);};
 </script>
 </body>
 </html>

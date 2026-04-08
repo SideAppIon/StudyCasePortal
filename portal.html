@@ -6,6 +6,16 @@
 <title>Study Case Portal</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sora:wght@700;800&display=swap" rel="stylesheet"/>
 
+<!-- ═══════════════════════════════════════════════════════════
+     ГЛОБАЛЬНЫЕ ОБРАБОТЧИКИ — должны быть вне type="module"
+     чтобы onclick="" в HTML мог их вызвать
+     ════════════════════════════════════════════════════════════ -->
+<script>
+  // Все window.* функции будут назначены из модуля ниже.
+  // Этот блок — просто заглушки чтобы браузер не ругался до загрузки модуля.
+  window._ready = false;
+</script>
+
 <script type="module">
 import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
@@ -14,9 +24,9 @@ import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc,
   updateDoc, deleteDoc, query, where, orderBy, serverTimestamp }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  КЛЮЧИ FIREBASE
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 const firebaseConfig = {
   apiKey:            "AIzaSyBKlsuYCWuCKzTuzHliIRONZIKWz_Q2f6w",
   authDomain:        "studycaseportal-1b584.firebaseapp.com",
@@ -30,578 +40,512 @@ const app  = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db   = getFirestore(app);
 
-// ══════════════════════════════════════════════════════════════
-//  ЛОГОТИП
-//  Положи файл logo.png рядом с portal.html в GitHub репозитории
-//  Если файла нет — показывается текстовое название
-// ══════════════════════════════════════════════════════════════
-const LOGO_FILE = 'logo.png'; // ← имя файла логотипа в репозитории
-const logoImg   = new Image();
-logoImg.onload  = () => { document.querySelectorAll('.logo-img').forEach(el=>{ el.src=LOGO_FILE; el.style.display='block'; }); document.querySelectorAll('.logo-text').forEach(el=>el.style.display='none'); };
-logoImg.onerror = () => {}; // нет файла — остаётся текст
-logoImg.src = LOGO_FILE;
+// ═══════════════════════════════════════════════════════════════
+//  ЛОГОТИП — положи logo.png рядом с portal.html в репозитории
+// ═══════════════════════════════════════════════════════════════
+(function tryLogo(){
+  const probe=new Image();
+  probe.onload=()=>{
+    document.querySelectorAll('.logo-img').forEach(el=>{el.src='logo.png';el.style.display='block';});
+    document.querySelectorAll('.logo-text').forEach(el=>el.style.display='none');
+  };
+  probe.src='logo.png';
+})();
 
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  УТИЛИТЫ
-// ══════════════════════════════════════════════════════════════
-const $  = id => document.getElementById(id);
-const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-// Для подстановки в inline onclick='...': безопасная JS-строка в одинарных кавычках
-const jsq = s => String(s??'')
-  .replace(/\\/g,'\\\\')
-  .replace(/'/g,"\\'")
-  .replace(/\r/g,'\\r')
-  .replace(/\n/g,'\\n');
-const fmt = ts => { if(!ts)return'—'; const d=ts.toDate?ts.toDate():new Date(ts); return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); };
-const gradeColor = g => { if(!g)return'gray'; if(g.startsWith('A'))return'green'; if(g.startsWith('B'))return'blue'; if(g.startsWith('C'))return'orange'; if(g==='D')return'red'; if(g==='F')return'darkred'; return'gray'; };
-const isAdmin = ()=> userProfile?.role==='admin';
-const isTeacher = ()=> userProfile?.role==='teacher';
-const canManageAccess = ()=> isAdmin() || isTeacher();
+// ═══════════════════════════════════════════════════════════════
+const $   = id => document.getElementById(id);
+const esc = s  => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fmt = ts => {
+  if(!ts) return '—';
+  const d=ts.toDate?ts.toDate():new Date(ts);
+  return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})
+    +' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+};
+const gradeColor = g => {
+  if(!g) return 'gray';
+  if(g.startsWith('A')) return 'green';
+  if(g.startsWith('B')) return 'blue';
+  if(g.startsWith('C')) return 'orange';
+  if(g==='D') return 'red';
+  if(g==='F') return 'darkred';
+  return 'gray';
+};
 
-function show(id) {
+function show(id){
   document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
   $(id)?.classList.remove('hidden');
 }
-
-function toast(msg, type='info') {
-  const t=document.createElement('div'); t.className=`toast toast-${type}`; t.textContent=msg;
-  document.body.appendChild(t); setTimeout(()=>t.remove(),3500);
+function toast(msg,type='info'){
+  const t=document.createElement('div');
+  t.className=`toast toast-${type}`;
+  t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),3500);
 }
+function closeModal(id){ $(id).classList.add('hidden'); }
+function openModal(id) { $(id).classList.remove('hidden'); }
 
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  СОСТОЯНИЕ
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 let currentUser      = null;
 let userProfile      = null;
-let selectedCourseId = null;
-let accessCourseId   = null;
-let accessTopicId    = null;
+let selectedCourseId = null;  // курс в котором мы сейчас в разделе тем
+let accessCourseId   = null;  // курс для модалки доступа к курсу
+let accessTopicId    = null;  // тема для модалки доступа к теме
 
-// Блоки текущего редактора темы — глубокая копия из Firestore
-let editorBlocks = [];
-let editorTopicId   = null;  // null = новая тема
-let editorCourseId  = null;
+// Редактор тем
+let editorBlocks   = [];
+let editorTopicId  = null;
+let editorCourseId = null;
 
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  АВТОРИЗАЦИЯ
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 onAuthStateChanged(auth, async user => {
-  if (!user) { show('screen-login'); return; }
+  if(!user){ show('screen-login'); return; }
   const snap = await getDoc(doc(db,'users',user.uid));
-  if (!snap.exists()) { await signOut(auth); show('screen-login'); toast('Пользователь не найден','error'); return; }
-  currentUser = user;
-  userProfile = snap.data();
+  if(!snap.exists()){ await signOut(auth); show('screen-login'); toast('Пользователь не найден','error'); return; }
+  currentUser  = user;
+  userProfile  = snap.data();
   applyNav();
-  if      (userProfile.role==='admin')   { await loadAdminCourses(); show('screen-admin-courses'); }
-  else if (userProfile.role==='teacher') { await loadAdminCourses(); show('screen-admin-courses'); }
-  else                                   { await loadStudentCourses(); show('screen-student-courses'); }
+  if(userProfile.role==='admin')        { await loadAdminCourses(); show('screen-admin-courses'); }
+  else if(userProfile.role==='teacher') { await loadTeacherAnswers(); show('screen-teacher'); }
+  else                                  { await loadStudentCourses(); show('screen-student-courses'); }
 });
 
-$('btn-login').addEventListener('click', async () => {
+$('btn-login').addEventListener('click', async ()=>{
   const email=$('login-email').value.trim(), pass=$('login-pass').value;
-  if(!email||!pass){toast('Заполни все поля','error');return;}
-  try { await signInWithEmailAndPassword(auth,email,pass); }
-  catch { toast('Неверный email или пароль','error'); }
+  if(!email||!pass){ toast('Заполни все поля','error'); return; }
+  try{ await signInWithEmailAndPassword(auth,email,pass); }
+  catch{ toast('Неверный email или пароль','error'); }
 });
 
-$('btn-logout').addEventListener('click', async () => {
+$('btn-logout').addEventListener('click', async ()=>{
   await signOut(auth);
   $('app-nav').classList.add('hidden');
   currentUser=null; userProfile=null;
   show('screen-login');
 });
 
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  НАВИГАЦИЯ
-// ══════════════════════════════════════════════════════════════
-function applyNav() {
+// ═══════════════════════════════════════════════════════════════
+function applyNav(){
   $('app-nav').classList.remove('hidden');
-  $('nav-username').textContent = userProfile.name||currentUser.email;
-  $('nav-role-badge').textContent = userProfile.role==='admin'?'Администратор':userProfile.role==='teacher'?'Преподаватель':'Студент';
+  $('nav-username').textContent    = userProfile.name||currentUser.email;
+  $('nav-role-badge').textContent  = userProfile.role==='admin'?'Администратор':userProfile.role==='teacher'?'Преподаватель':'Студент';
   const a=userProfile.role==='admin', t=userProfile.role==='teacher', s=userProfile.role==='student';
   ['nav-courses-a','nav-users-a','nav-answers-a','nav-grades-a'].forEach(id=>$(id).classList.toggle('hidden',!a));
-  ['nav-courses-t','nav-answers-t','nav-grades-t'].forEach(id=>$(id).classList.toggle('hidden',!t));
+  ['nav-answers-t','nav-grades-t'].forEach(id=>$(id).classList.toggle('hidden',!t));
   ['nav-courses-s','nav-grades-s'].forEach(id=>$(id).classList.toggle('hidden',!s));
 }
 
-$('nav-courses-a').addEventListener('click',  ()=>{ loadAdminCourses();   show('screen-admin-courses'); });
-$('nav-users-a').addEventListener('click',    ()=>{ loadAdminUsers();     show('screen-admin-users'); });
-$('nav-answers-a').addEventListener('click',  ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
-$('nav-grades-a').addEventListener('click',   ()=>{ loadGradesJournal();  show('screen-grades'); });
-$('nav-courses-t').addEventListener('click',  ()=>{ loadAdminCourses();   show('screen-admin-courses'); });
-$('nav-answers-t').addEventListener('click',  ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
-$('nav-grades-t').addEventListener('click',   ()=>{ loadGradesJournal();  show('screen-grades'); });
-$('nav-courses-s').addEventListener('click',  ()=>{ loadStudentCourses(); show('screen-student-courses'); });
-$('nav-grades-s').addEventListener('click',   ()=>{ loadStudentGrades();  show('screen-my-grades'); });
+$('nav-courses-a').addEventListener('click', ()=>{ loadAdminCourses();   show('screen-admin-courses'); });
+$('nav-users-a').addEventListener('click',   ()=>{ loadAdminUsers();     show('screen-admin-users'); });
+$('nav-answers-a').addEventListener('click', ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
+$('nav-grades-a').addEventListener('click',  ()=>{ loadGradesJournal();  show('screen-grades'); });
+$('nav-answers-t').addEventListener('click', ()=>{ loadTeacherAnswers(); show('screen-teacher'); });
+$('nav-grades-t').addEventListener('click',  ()=>{ loadGradesJournal();  show('screen-grades'); });
+$('nav-courses-s').addEventListener('click', ()=>{ loadStudentCourses(); show('screen-student-courses'); });
+$('nav-grades-s').addEventListener('click',  ()=>{ loadStudentGrades();  show('screen-my-grades'); });
 
-// ══════════════════════════════════════════════════════════════
-//  АДМИНИСТРАТОР — КУРСЫ
-// ══════════════════════════════════════════════════════════════
-async function loadAdminCourses() {
-  const snap=await getDocs(collection(db,'courses'));
-  const list=$('admin-courses-list'); list.innerHTML='';
-  if(snap.empty){list.innerHTML='<p class="empty-msg">Курсов нет. Создай первый!</p>';return;}
-  snap.forEach(d=>{
-    const c=d.data(); const card=document.createElement('div'); card.className='card';
-    const canEdit=isAdmin();
-    card.innerHTML=`
-      <div class="card-info"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
-      <div class="card-actions">
-        <button class="btn btn-sm btn-secondary" onclick="goAdminTopics('${d.id}','${jsq(c.title)}')">Темы</button>
-        ${canManageAccess()?`<button class="btn btn-sm btn-accent" onclick="openCourseAccess('${d.id}','${jsq(c.title)}')">Доступ студентов</button>`:''}
-        ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="deleteCourse('${d.id}')">Удалить</button>`:''}
-      </div>`;
-    list.appendChild(card);
-  });
-  $('btn-create-course')?.classList.toggle('hidden',!isAdmin());
+// ═══════════════════════════════════════════════════════════════
+//  ВСПОМОГАТЕЛЬНО: создаём кнопку без onclick-строки
+//  Это ключевое решение проблемы с module scope!
+//  Вместо onclick="fn()" используем addEventListener на каждой кнопке
+// ═══════════════════════════════════════════════════════════════
+function makeBtn(label, cls, fn){
+  const b = document.createElement('button');
+  b.className = 'btn btn-sm '+cls;
+  b.textContent = label;
+  b.addEventListener('click', fn);
+  return b;
 }
 
-$('btn-create-course').addEventListener('click',()=>$('modal-course').classList.remove('hidden'));
-$('btn-course-cancel').addEventListener('click',()=>$('modal-course').classList.add('hidden'));
+// ═══════════════════════════════════════════════════════════════
+//  АДМИНИСТРАТОР — КУРСЫ
+// ═══════════════════════════════════════════════════════════════
+async function loadAdminCourses(){
+  const snap = await getDocs(collection(db,'courses'));
+  const list = $('admin-courses-list'); list.innerHTML='';
+  if(snap.empty){ list.innerHTML='<p class="empty-msg">Курсов нет. Создай первый!</p>'; return; }
+  snap.forEach(d=>{
+    const c = d.data();
+    const card = document.createElement('div'); card.className='card';
+    const info = document.createElement('div'); info.className='card-info';
+    info.innerHTML = `<h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p>`;
+    const actions = document.createElement('div'); actions.className='card-actions';
+    actions.appendChild(makeBtn('Темы',        'btn-secondary', ()=>goAdminTopics(d.id, c.title)));
+    actions.appendChild(makeBtn('Доступ студентов', 'btn-accent', ()=>openCourseAccess(d.id, c.title)));
+    actions.appendChild(makeBtn('Удалить',     'btn-ghost',     ()=>deleteCourse(d.id)));
+    card.appendChild(info); card.appendChild(actions);
+    list.appendChild(card);
+  });
+}
+
+$('btn-create-course').addEventListener('click', ()=>openModal('modal-course'));
+$('btn-course-cancel').addEventListener('click', ()=>closeModal('modal-course'));
 $('btn-course-save').addEventListener('click', async ()=>{
   const title=$('inp-course-title').value.trim(), desc=$('inp-course-desc').value.trim();
-  if(!title){toast('Введи название','error');return;}
+  if(!title){ toast('Введи название','error'); return; }
   await addDoc(collection(db,'courses'),{title,description:desc,createdAt:serverTimestamp()});
-  $('modal-course').classList.add('hidden'); $('inp-course-title').value=''; $('inp-course-desc').value='';
+  closeModal('modal-course'); $('inp-course-title').value=''; $('inp-course-desc').value='';
   toast('Курс создан','success'); loadAdminCourses();
 });
-window.deleteCourse=async id=>{ if(!confirm('Удалить курс и все темы?'))return; await deleteDoc(doc(db,'courses',id)); toast('Удалён'); loadAdminCourses(); };
 
-// ══════════════════════════════════════════════════════════════
-//  ДОСТУП К КУРСУ — кто из студентов видит курс
-// ══════════════════════════════════════════════════════════════
-window.openCourseAccess=async(courseId,courseTitle)=>{
-  if(!canManageAccess()){ toast('Недостаточно прав','error'); return; }
-  accessCourseId=courseId;
-  $('lbl-course-access-title').textContent=courseTitle;
-  const usersSnap=await getDocs(query(collection(db,'users'),where('role','==','student')));
-  const enrollSnap=await getDocs(collection(db,'courses',courseId,'enrollments'));
-  const enrolled=new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
-  const list=$('course-access-list'); list.innerHTML='';
-  if(usersSnap.empty){list.innerHTML='<p class="empty-msg">Студентов нет. Создай пользователей.</p>';return;}
-  usersSnap.forEach(d=>{
-    const u=d.data(); const row=document.createElement('div'); row.className='access-row';
-    row.innerHTML=`<label class="access-label"><input type="checkbox" data-uid="${d.id}" ${enrolled.has(d.id)?'checked':''}/><span>${esc(u.name||u.email)}</span><small>${esc(u.email)}</small></label>`;
-    list.appendChild(row);
-  });
-  await renderCourseGroupsUI(courseId,'course');
-  $('modal-course-access').classList.remove('hidden');
-};
-$('btn-course-access-cancel').addEventListener('click',()=>$('modal-course-access').classList.add('hidden'));
-$('btn-course-access-save').addEventListener('click',async()=>{
-  const cbs=document.querySelectorAll('#course-access-list input[type=checkbox]');
-  try{
-    await Promise.all([...cbs].map(cb=>{
-      const r=doc(db,'courses',accessCourseId,'enrollments',cb.dataset.uid);
-      return cb.checked ? setDoc(r,{at:serverTimestamp(),by:currentUser.uid}) : deleteDoc(r);
-    }));
-    toast('Доступ к курсу сохранён','success'); $('modal-course-access').classList.add('hidden');
-  }catch(e){
-    console.error(e);
-    toast('Ошибка сохранения доступа: '+(e?.message||e),'error');
-  }
-});
-
-// ══════════════════════════════════════════════════════════════
-//  АДМИНИСТРАТОР — ТЕМЫ
-// ══════════════════════════════════════════════════════════════
-window.goAdminTopics=async(courseId,courseTitle)=>{
-  selectedCourseId=courseId;
-  $('lbl-admin-course-title').textContent=courseTitle;
-  await loadAdminTopics(); show('screen-admin-topics');
-};
-
-async function loadAdminTopics() {
-  const snap=await getDocs(collection(db,'courses',selectedCourseId,'topics'));
-  const list=$('admin-topics-list'); list.innerHTML='';
-  const topics=[]; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
-  topics.sort((a,b)=>(a.order||0)-(b.order||0));
-  if(!topics.length){list.innerHTML='<p class="empty-msg">Тем нет. Создай первую!</p>';return;}
-  topics.forEach(t=>{
-    const blockCount=(t.blocks||[]).length;
-    const card=document.createElement('div'); card.className='card';
-    const canEdit=isAdmin();
-    card.innerHTML=`
-      <div class="card-info"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${blockCount}</p></div>
-      <div class="card-actions">
-        ${canEdit?`<button class="btn btn-sm btn-secondary" onclick="openTopicEditor('${t.id}')">✏ Редактировать</button>`:''}
-        ${canManageAccess()?`<button class="btn btn-sm btn-accent" onclick="openTopicAccess('${t.id}','${jsq(t.title)}')">🔓 Доступ</button>`:''}
-        ${canEdit?`<button class="btn btn-sm btn-ghost" onclick="deleteTopic('${t.id}')">Удалить</button>`:''}
-      </div>`;
-    list.appendChild(card);
-  });
-  $('btn-new-topic')?.classList.toggle('hidden',!isAdmin());
+async function deleteCourse(id){
+  if(!confirm('Удалить курс?')) return;
+  await deleteDoc(doc(db,'courses',id)); toast('Удалён'); loadAdminCourses();
 }
 
-$('btn-back-to-courses').addEventListener('click',()=>{ loadAdminCourses(); show('screen-admin-courses'); });
-$('btn-new-topic').addEventListener('click',()=>{
+// ═══════════════════════════════════════════════════════════════
+//  ДОСТУП К КУРСУ
+// ═══════════════════════════════════════════════════════════════
+async function openCourseAccess(courseId, courseTitle){
+  accessCourseId = courseId;
+  $('lbl-course-access-title').textContent = courseTitle;
+
+  // Загружаем всех студентов
+  const usersSnap  = await getDocs(query(collection(db,'users'), where('role','==','student')));
+  // Загружаем уже записанных
+  const enrollSnap = await getDocs(collection(db,'courses',courseId,'enrollments'));
+  const enrolled   = new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
+
+  const list = $('course-access-list'); list.innerHTML='';
+  if(usersSnap.empty){ list.innerHTML='<p class="empty-msg">Студентов нет. Создай пользователей.</p>'; openModal('modal-course-access'); return; }
+
+  usersSnap.forEach(d=>{
+    const u   = d.data();
+    const row = document.createElement('div'); row.className='access-row';
+    const grp = u.group ? ` <span class="group-tag">${esc(u.group)}</span>` : '';
+    row.innerHTML = `<label class="access-label">
+      <input type="checkbox" data-uid="${d.id}" ${enrolled.has(d.id)?'checked':''}/>
+      <span>${esc(u.name||u.email)}${grp}</span>
+      <small>${esc(u.email)}</small>
+    </label>`;
+    list.appendChild(row);
+  });
+  openModal('modal-course-access');
+}
+
+$('btn-course-access-cancel').addEventListener('click', ()=>closeModal('modal-course-access'));
+$('btn-course-access-save').addEventListener('click', async ()=>{
+  const cbs = document.querySelectorAll('#course-access-list input[type=checkbox]');
+  try{
+    await Promise.all([...cbs].map(cb=>{
+      const r = doc(db,'courses',accessCourseId,'enrollments',cb.dataset.uid);
+      return cb.checked ? setDoc(r,{at:serverTimestamp()}) : deleteDoc(r);
+    }));
+    toast('Доступ к курсу сохранён ✓','success');
+  }catch(e){ toast('Ошибка: '+e.message,'error'); }
+  closeModal('modal-course-access');
+});
+
+// ═══════════════════════════════════════════════════════════════
+//  АДМИНИСТРАТОР — ТЕМЫ
+// ═══════════════════════════════════════════════════════════════
+async function goAdminTopics(courseId, courseTitle){
+  selectedCourseId = courseId;
+  $('lbl-admin-course-title').textContent = courseTitle;
+  await loadAdminTopics();
+  show('screen-admin-topics');
+}
+
+async function loadAdminTopics(){
+  const snap = await getDocs(collection(db,'courses',selectedCourseId,'topics'));
+  const list = $('admin-topics-list'); list.innerHTML='';
+  const topics=[]; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
+  topics.sort((a,b)=>(a.order||0)-(b.order||0));
+  if(!topics.length){ list.innerHTML='<p class="empty-msg">Тем нет. Создай первую!</p>'; return; }
+  topics.forEach(t=>{
+    const blockCount=(t.blocks||[]).length;
+    const card = document.createElement('div'); card.className='card';
+    const info = document.createElement('div'); info.className='card-info';
+    info.innerHTML=`<h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${blockCount}</p>`;
+    const actions = document.createElement('div'); actions.className='card-actions';
+    actions.appendChild(makeBtn('✏ Редактировать', 'btn-secondary', ()=>openTopicEditor(t.id)));
+    actions.appendChild(makeBtn('🔓 Доступ',        'btn-accent',    ()=>openTopicAccess(t.id, t.title)));
+    actions.appendChild(makeBtn('Удалить',          'btn-ghost',     ()=>deleteTopic(t.id)));
+    card.appendChild(info); card.appendChild(actions);
+    list.appendChild(card);
+  });
+}
+
+$('btn-back-to-courses').addEventListener('click', ()=>{ loadAdminCourses(); show('screen-admin-courses'); });
+
+$('btn-new-topic').addEventListener('click', ()=>{
   editorTopicId=null; editorCourseId=selectedCourseId; editorBlocks=[];
   $('inp-topic-title').value=''; $('inp-topic-order').value='0';
   $('lbl-editor-title').textContent='Новая тема';
   renderEditor(); show('screen-topic-editor');
 });
 
-window.openTopicEditor=async topicId=>{
+async function openTopicEditor(topicId){
   editorTopicId=topicId; editorCourseId=selectedCourseId;
-  const snap=await getDoc(doc(db,'courses',selectedCourseId,'topics',topicId));
-  const t=snap.data();
-  $('inp-topic-title').value=t.title||'';
-  $('inp-topic-order').value=t.order||0;
-  $('lbl-editor-title').textContent='Редактировать тему';
-  // Глубокая копия блоков из Firestore
-  editorBlocks=JSON.parse(JSON.stringify(t.blocks||[]));
+  const snap = await getDoc(doc(db,'courses',selectedCourseId,'topics',topicId));
+  const t    = snap.data();
+  $('inp-topic-title').value            = t.title||'';
+  $('inp-topic-order').value            = t.order||0;
+  $('lbl-editor-title').textContent     = 'Редактировать тему';
+  editorBlocks = JSON.parse(JSON.stringify(t.blocks||[]));
   renderEditor(); show('screen-topic-editor');
-};
+}
 
-window.deleteTopic=async id=>{ if(!confirm('Удалить тему?'))return; await deleteDoc(doc(db,'courses',selectedCourseId,'topics',id)); toast('Удалено'); loadAdminTopics(); };
+async function deleteTopic(id){
+  if(!confirm('Удалить тему?')) return;
+  await deleteDoc(doc(db,'courses',selectedCourseId,'topics',id));
+  toast('Тема удалена'); loadAdminTopics();
+}
 
-$('btn-editor-back').addEventListener('click',()=>{ loadAdminTopics(); show('screen-admin-topics'); });
+$('btn-editor-back').addEventListener('click', ()=>{ loadAdminTopics(); show('screen-admin-topics'); });
 
-$('btn-editor-save').addEventListener('click',async()=>{
-  const title=$('inp-topic-title').value.trim();
-  if(!title){toast('Введи название темы','error');return;}
-
-  // Читаем актуальные значения из DOM перед сохранением
+$('btn-editor-save').addEventListener('click', async ()=>{
+  const title = $('inp-topic-title').value.trim();
+  if(!title){ toast('Введи название темы','error'); return; }
   syncEditorFromDOM();
-
-  // Валидация: убираем пустые блоки
-  const blocks=editorBlocks.filter(b=>{
-    if(b.type==='text')     return (b.content||'').trim()!=='';
-    if(b.type==='image')    return (b.url||'').trim()!=='';
-    if(b.type==='video')    return (b.url||'').trim()!=='';
-    if(b.type==='question') return (b.question||'').trim()!=='';
-    return true;
-  });
-
-  const data={
-    title, order:parseInt($('inp-topic-order').value)||0,
-    blocks, updatedAt:serverTimestamp()
+  // Не выбрасываем пустые блоки — пользователь может ещё не дозаполнить
+  const data = {
+    title,
+    order:  parseInt($('inp-topic-order').value)||0,
+    blocks: editorBlocks,
+    updatedAt: serverTimestamp()
   };
-
-  try {
+  try{
     if(editorTopicId){
-      await updateDoc(doc(db,'courses',editorCourseId,'topics',editorTopicId),data);
+      await updateDoc(doc(db,'courses',editorCourseId,'topics',editorTopicId), data);
       toast('Тема сохранена ✓','success');
     } else {
-      data.createdAt=serverTimestamp();
-      await addDoc(collection(db,'courses',editorCourseId,'topics'),data);
+      data.createdAt = serverTimestamp();
+      await addDoc(collection(db,'courses',editorCourseId,'topics'), data);
       toast('Тема создана ✓','success');
     }
-    selectedCourseId=editorCourseId;
+    selectedCourseId = editorCourseId;
     await loadAdminTopics(); show('screen-admin-topics');
-  } catch(e){ toast('Ошибка сохранения: '+e.message,'error'); console.error(e); }
+  } catch(e){ toast('Ошибка: '+e.message,'error'); console.error(e); }
 });
 
-// Синхронизация DOM → editorBlocks перед сохранением
-function syncEditorFromDOM() {
+// ─── БЛОКИ РЕДАКТОРА ───────────────────────────────────────────
+function syncEditorFromDOM(){
   editorBlocks.forEach((block,i)=>{
     if(block.type==='text'){
-      const el=document.getElementById('block-content-'+i);
-      if(el) block.content=el.value;
+      const el=$('bc-'+i); if(el) block.content=el.value;
     } else if(block.type==='image'){
-      const el=document.getElementById('block-url-'+i);
-      if(el) block.url=el.value.trim();
+      const el=$('bu-'+i); if(el) block.url=el.value.trim();
     } else if(block.type==='video'){
-      const el=document.getElementById('block-url-'+i);
-      if(el) block.url=el.value.trim();
+      const el=$('bv-'+i); if(el) block.url=el.value.trim();
     } else if(block.type==='question'){
-      const el=document.getElementById('block-question-'+i);
-      if(el) block.question=el.value;
+      const el=$('bq-'+i); if(el) block.question=el.value;
     }
   });
 }
 
-// ── РЕДАКТОР БЛОКОВ ─────────────────────────────────────────────
-$('btn-add-text').addEventListener('click',()=>{ syncEditorFromDOM(); editorBlocks.push({type:'text',content:''}); renderEditor(); });
-$('btn-add-image').addEventListener('click',()=>{ syncEditorFromDOM(); editorBlocks.push({type:'image',url:''}); renderEditor(); });
-$('btn-add-video').addEventListener('click',()=>{ syncEditorFromDOM(); editorBlocks.push({type:'video',url:''}); renderEditor(); });
-$('btn-add-question').addEventListener('click',()=>{ syncEditorFromDOM(); editorBlocks.push({type:'question',question:''}); renderEditor(); });
+$('btn-add-text').addEventListener('click',     ()=>{ syncEditorFromDOM(); editorBlocks.push({type:'text',content:''}); renderEditor(); });
+$('btn-add-image').addEventListener('click',    ()=>{ syncEditorFromDOM(); editorBlocks.push({type:'image',url:''}); renderEditor(); });
+$('btn-add-video').addEventListener('click',    ()=>{ syncEditorFromDOM(); editorBlocks.push({type:'video',url:''}); renderEditor(); });
+$('btn-add-question').addEventListener('click', ()=>{ syncEditorFromDOM(); editorBlocks.push({type:'question',question:''}); renderEditor(); });
 
-window.moveBlock=(i,dir)=>{ syncEditorFromDOM(); const b=editorBlocks.splice(i,1)[0]; editorBlocks.splice(i+dir,0,b); renderEditor(); };
-window.removeBlock=i=>{ if(!confirm('Удалить блок?'))return; syncEditorFromDOM(); editorBlocks.splice(i,1); renderEditor(); };
+function moveBlock(i, dir){
+  syncEditorFromDOM();
+  const b = editorBlocks.splice(i,1)[0];
+  editorBlocks.splice(i+dir,0,b);
+  renderEditor();
+}
+function removeBlock(i){
+  if(!confirm('Удалить блок?')) return;
+  syncEditorFromDOM();
+  editorBlocks.splice(i,1);
+  renderEditor();
+}
 
-function blockIcon(type){ return type==='text'?'📝':type==='image'?'🖼':type==='video'?'▶':'❓'; }
-function blockName(type){ return type==='text'?'Текст':type==='image'?'Картинка':type==='video'?'Видео':'Вопрос'; }
-
-function renderEditor() {
-  const container=$('blocks-container'); container.innerHTML='';
+function renderEditor(){
+  const container = $('blocks-container'); container.innerHTML='';
   if(!editorBlocks.length){
-    container.innerHTML='<p class="empty-msg">Нет блоков. Добавь блок кнопками выше.</p>'; return;
+    container.innerHTML='<p class="empty-msg">Нет блоков. Добавь блоки кнопками выше.</p>'; return;
   }
   editorBlocks.forEach((block,i)=>{
-    const wrap=document.createElement('div'); wrap.className='block-wrap';
+    const wrap = document.createElement('div'); wrap.className='block-wrap';
     const isFirst=i===0, isLast=i===editorBlocks.length-1;
-    let bodyHtml='';
+
+    // Заголовок блока с кнопками
+    const header = document.createElement('div'); header.className='block-header';
+    const typeLabel = document.createElement('span'); typeLabel.className='block-type';
+    typeLabel.textContent = (block.type==='text'?'📝 Текст':block.type==='image'?'🖼 Картинка':block.type==='video'?'▶ Видео':'❓ Вопрос');
+    const btns = document.createElement('div'); btns.className='block-btns';
+    if(!isFirst){ const u=document.createElement('button');u.className='bbtn';u.textContent='↑';u.addEventListener('click',()=>moveBlock(i,-1));btns.appendChild(u); }
+    if(!isLast) { const d=document.createElement('button');d.className='bbtn';d.textContent='↓';d.addEventListener('click',()=>moveBlock(i,1));btns.appendChild(d); }
+    const del=document.createElement('button');del.className='bbtn bbtn-del';del.textContent='✕';del.addEventListener('click',()=>removeBlock(i));btns.appendChild(del);
+    header.appendChild(typeLabel); header.appendChild(btns);
+
+    // Тело блока
+    const body = document.createElement('div'); body.className='block-body';
 
     if(block.type==='text'){
-      bodyHtml=`<textarea id="block-content-${i}" class="block-textarea" placeholder="Введи текст...">${esc(block.content||'')}</textarea>`;
+      const ta = document.createElement('textarea');
+      ta.id=`bc-${i}`; ta.className='block-textarea'; ta.placeholder='Введи текст...';
+      ta.value=block.content||'';
+      body.appendChild(ta);
 
     } else if(block.type==='image'){
-      bodyHtml=`
-        <label class="block-label">Прямая ссылка на картинку (https://...)</label>
-        <input id="block-url-${i}" type="url" class="block-input" value="${esc(block.url||'')}" placeholder="https://example.com/photo.jpg"/>
-        <p class="block-hint">Загрузи картинку на <a href="https://imgbb.com" target="_blank">imgbb.com</a> или <a href="https://imgur.com" target="_blank">imgur.com</a> — они бесплатны — и вставь прямую ссылку сюда.</p>
-        ${block.url?`<img src="${esc(block.url)}" class="block-preview" onerror="this.style.display='none'"/>`:'' }`;
+      const lbl=document.createElement('label'); lbl.className='block-label'; lbl.textContent='Прямая ссылка на картинку (https://...)';
+      const inp=document.createElement('input'); inp.type='url'; inp.id=`bu-${i}`; inp.className='block-input'; inp.value=block.url||''; inp.placeholder='https://i.imgur.com/example.jpg';
+      const hint=document.createElement('p'); hint.className='block-hint';
+      hint.innerHTML='Загрузи на <a href="https://imgbb.com" target="_blank">imgbb.com</a> или <a href="https://imgur.com" target="_blank">imgur.com</a> (бесплатно) и вставь прямую ссылку.';
+      body.appendChild(lbl); body.appendChild(inp); body.appendChild(hint);
+      if(block.url){
+        const prev=document.createElement('img'); prev.className='block-preview'; prev.src=block.url;
+        prev.onerror=()=>prev.style.display='none'; body.appendChild(prev);
+      }
 
     } else if(block.type==='video'){
-      bodyHtml=`
-        <label class="block-label">Ссылка или код для встраивания видео</label>
-        <textarea id="block-url-${i}" class="block-textarea block-textarea-sm" placeholder="Вставь ссылку YouTube / ВКонтакте / vkvideo.ru ИЛИ весь код &lt;iframe ...&gt;">${esc(block.url||'')}</textarea>
-        <p class="block-hint">Поддерживается: YouTube, ВКонтакте (ссылка или iframe-код), прямая ссылка на .mp4</p>`;
+      const lbl=document.createElement('label'); lbl.className='block-label'; lbl.textContent='Ссылка на видео или iframe-код';
+      const ta=document.createElement('textarea');
+      ta.id=`bv-${i}`; ta.className='block-textarea block-textarea-sm';
+      ta.placeholder='YouTube: https://youtube.com/watch?v=...\nВКонтакте: https://vkvideo.ru/video-123_456\nИли вставь весь <iframe ...> код';
+      ta.value=block.url||'';
+      const hint=document.createElement('p'); hint.className='block-hint';
+      hint.textContent='Поддерживается: YouTube, ВКонтакте (ссылка или iframe-код), прямая .mp4 ссылка';
+      body.appendChild(lbl); body.appendChild(ta); body.appendChild(hint);
 
     } else if(block.type==='question'){
-      bodyHtml=`
-        <label class="block-label">Вопрос для студента</label>
-        <textarea id="block-question-${i}" class="block-textarea block-textarea-sm" placeholder="Напиши вопрос...">${esc(block.question||'')}</textarea>`;
+      const lbl=document.createElement('label'); lbl.className='block-label'; lbl.textContent='Вопрос для студента';
+      const ta=document.createElement('textarea');
+      ta.id=`bq-${i}`; ta.className='block-textarea block-textarea-sm';
+      ta.placeholder='Напиши вопрос...'; ta.value=block.question||'';
+      body.appendChild(lbl); body.appendChild(ta);
     }
 
-    wrap.innerHTML=`
-      <div class="block-header">
-        <span class="block-type">${blockIcon(block.type)} ${blockName(block.type)}</span>
-        <div class="block-btns">
-          ${!isFirst?`<button class="bbtn" onclick="moveBlock(${i},-1)">↑</button>`:''}
-          ${!isLast?`<button class="bbtn" onclick="moveBlock(${i},1)">↓</button>`:''}
-          <button class="bbtn bbtn-del" onclick="removeBlock(${i})">✕</button>
-        </div>
-      </div>
-      <div class="block-body">${bodyHtml}</div>`;
+    wrap.appendChild(header); wrap.appendChild(body);
     container.appendChild(wrap);
   });
 }
 
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  ДОСТУП К ТЕМЕ
-// ══════════════════════════════════════════════════════════════
-window.openTopicAccess=async(topicId,topicTitle)=>{
-  if(!canManageAccess()){ toast('Недостаточно прав','error'); return; }
-  accessTopicId=topicId;
-  $('lbl-access-topic-name').textContent=topicTitle;
+// ═══════════════════════════════════════════════════════════════
+async function openTopicAccess(topicId, topicTitle){
+  accessTopicId = topicId;
+  $('lbl-access-topic-name').textContent = topicTitle;
 
-  // Берём только студентов, записанных на этот курс
-  const enrollSnap=await getDocs(collection(db,'courses',selectedCourseId,'enrollments'));
-  const enrolled=new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
+  // Кто записан на курс
+  const enrollSnap = await getDocs(collection(db,'courses',selectedCourseId,'enrollments'));
+  const enrolled   = new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
 
-  // Текущий доступ к теме
-  const accessSnap=await getDocs(collection(db,'courses',selectedCourseId,'topics',topicId,'access'));
-  const allowed=new Set(); accessSnap.forEach(d=>allowed.add(d.id));
+  // Кому уже открыта тема
+  const accessSnap = await getDocs(collection(db,'courses',selectedCourseId,'topics',topicId,'access'));
+  const allowed    = new Set(); accessSnap.forEach(d=>allowed.add(d.id));
 
-  // Загружаем профили студентов курса
-  const list=$('topic-access-list'); list.innerHTML='';
-  if(!enrolled.size){list.innerHTML='<p class="empty-msg">На этот курс ещё никто не записан. Сначала открой доступ к курсу.</p>';$('modal-topic-access').classList.remove('hidden');return;}
+  const list = $('topic-access-list'); list.innerHTML='';
 
-  const usersSnap=await getDocs(query(collection(db,'users'),where('role','==','student')));
-  let shown=0;
+  if(!enrolled.size){
+    list.innerHTML='<p class="empty-msg">На этот курс никто не записан. Сначала открой доступ к курсу (кнопка "Доступ студентов").</p>';
+    openModal('modal-topic-access'); return;
+  }
+
+  // Загружаем профили только записанных студентов
+  const usersSnap = await getDocs(query(collection(db,'users'),where('role','==','student')));
+  let shown = 0;
   usersSnap.forEach(d=>{
-    if(!enrolled.has(d.id))return;
+    if(!enrolled.has(d.id)) return;
     shown++;
-    const u=d.data(); const row=document.createElement('div'); row.className='access-row';
-    row.innerHTML=`<label class="access-label"><input type="checkbox" data-uid="${d.id}" ${allowed.has(d.id)?'checked':''}/><span>${esc(u.name||u.email)}</span><small>${esc(u.email)}</small></label>`;
+    const u   = d.data();
+    const row = document.createElement('div'); row.className='access-row';
+    const grp = u.group ? ` <span class="group-tag">${esc(u.group)}</span>` : '';
+    row.innerHTML=`<label class="access-label">
+      <input type="checkbox" data-uid="${d.id}" ${allowed.has(d.id)?'checked':''}/>
+      <span>${esc(u.name||u.email)}${grp}</span>
+      <small>${esc(u.email)}</small>
+    </label>`;
     list.appendChild(row);
   });
-  if(!shown)list.innerHTML='<p class="empty-msg">Нет студентов записанных на этот курс.</p>';
-  await renderCourseGroupsUI(selectedCourseId,'topic');
-  $('modal-topic-access').classList.remove('hidden');
-};
-$('btn-topic-access-cancel').addEventListener('click',()=>$('modal-topic-access').classList.add('hidden'));
-$('btn-topic-access-save').addEventListener('click',async()=>{
-  const cbs=document.querySelectorAll('#topic-access-list input[type=checkbox]');
-  if(!cbs.length){$('modal-topic-access').classList.add('hidden');return;}
+
+  if(!shown) list.innerHTML='<p class="empty-msg">Нет студентов записанных на этот курс.</p>';
+  openModal('modal-topic-access');
+}
+
+$('btn-topic-access-cancel').addEventListener('click', ()=>closeModal('modal-topic-access'));
+$('btn-topic-access-save').addEventListener('click', async ()=>{
+  const cbs = document.querySelectorAll('#topic-access-list input[type=checkbox]');
+  if(!cbs.length){ closeModal('modal-topic-access'); return; }
   try{
     await Promise.all([...cbs].map(cb=>{
-      const r=doc(db,'courses',selectedCourseId,'topics',accessTopicId,'access',cb.dataset.uid);
-      return cb.checked ? setDoc(r,{at:serverTimestamp(),by:currentUser.uid}) : deleteDoc(r);
+      const r = doc(db,'courses',selectedCourseId,'topics',accessTopicId,'access',cb.dataset.uid);
+      return cb.checked ? setDoc(r,{at:serverTimestamp()}) : deleteDoc(r);
     }));
-    toast('Доступ к теме сохранён','success'); $('modal-topic-access').classList.add('hidden');
-  }catch(e){
-    console.error(e);
-    toast('Ошибка сохранения доступа: '+(e?.message||e),'error');
-  }
+    toast('Доступ к теме сохранён ✓','success');
+  } catch(e){ toast('Ошибка: '+e.message,'error'); }
+  closeModal('modal-topic-access');
 });
 
-// ══════════════════════════════════════════════════════════════
-//  ГРУППЫ СТУДЕНТОВ (внутри курса)
-//  courses/{courseId}/groups/{groupId} { name, memberIds[] }
-// ══════════════════════════════════════════════════════════════
-async function loadCourseGroups(courseId){
-  const snap=await getDocs(collection(db,'courses',courseId,'groups'));
-  const groups=[];
-  snap.forEach(d=>groups.push({id:d.id,...d.data()}));
-  groups.sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ru'));
-  return groups;
-}
-
-function getCheckedStudentIds(listSelector){
-  const cbs=document.querySelectorAll(listSelector+' input[type=checkbox]');
-  return [...cbs].filter(cb=>cb.checked).map(cb=>cb.dataset.uid);
-}
-
-function setCheckedStudentIds(listSelector, idsSet){
-  const cbs=document.querySelectorAll(listSelector+' input[type=checkbox]');
-  [...cbs].forEach(cb=>{ cb.checked = idsSet.has(cb.dataset.uid); });
-}
-
-async function createOrUpdateGroup(courseId, groupId, name, memberIds){
-  const ref = groupId
-    ? doc(db,'courses',courseId,'groups',groupId)
-    : doc(collection(db,'courses',courseId,'groups'));
-  await setDoc(ref,{
-    name: name.trim(),
-    memberIds: Array.from(new Set(memberIds)),
-    updatedAt: serverTimestamp(),
-    updatedBy: currentUser.uid
-  },{merge:true});
-  return ref.id;
-}
-
-async function deleteGroup(courseId, groupId){
-  await deleteDoc(doc(db,'courses',courseId,'groups',groupId));
-}
-
-async function renderCourseGroupsUI(courseId, mode){
-  // mode: 'course' | 'topic'
-  const containerId = mode==='course' ? 'course-access-groups' : 'topic-access-groups';
-  const listSelector = mode==='course' ? '#course-access-list' : '#topic-access-list';
-  const container = $(containerId);
-  if(!container) return;
-
-  const groups = await loadCourseGroups(courseId);
-  container.innerHTML = `
-    <div class="groups-box">
-      <div class="groups-head">
-        <strong>Группы</strong>
-        <span class="muted">— для массового выбора студентов</span>
-      </div>
-      <div class="groups-actions">
-        <input id="${containerId}-name" type="text" placeholder="Название группы (например, 10А)" />
-        <button class="btn btn-sm btn-secondary" id="${containerId}-create">Создать из отмеченных</button>
-      </div>
-      <div id="${containerId}-list" class="groups-list"></div>
-    </div>
-  `;
-
-  const listEl = document.getElementById(containerId+'-list');
-  if(!groups.length){
-    listEl.innerHTML = `<p class="muted" style="padding:.5rem 0">Групп пока нет</p>`;
-  } else {
-    listEl.innerHTML = groups.map(g=>`
-      <div class="group-row">
-        <div class="group-info">
-          <div class="group-name">${esc(g.name||'Без названия')}</div>
-          <div class="muted">Студентов: ${(g.memberIds||[]).length}</div>
-        </div>
-        <div class="group-btns">
-          <button class="btn btn-sm btn-secondary" data-act="apply" data-gid="${g.id}">Применить</button>
-          <button class="btn btn-sm btn-secondary" data-act="add" data-gid="${g.id}">Добавить отмеченных</button>
-          <button class="btn btn-sm btn-ghost" data-act="del" data-gid="${g.id}">Удалить</button>
-        </div>
-      </div>
-    `).join('');
-  }
-
-  const nameInp = document.getElementById(containerId+'-name');
-  const createBtn = document.getElementById(containerId+'-create');
-  createBtn.addEventListener('click', async ()=>{
-    const name = nameInp.value.trim();
-    if(!name){ toast('Введи название группы','error'); return; }
-    const ids = getCheckedStudentIds(listSelector);
-    if(!ids.length){ toast('Отметь студентов для группы','error'); return; }
-    try{
-      await createOrUpdateGroup(courseId, null, name, ids);
-      nameInp.value='';
-      toast('Группа создана','success');
-      await renderCourseGroupsUI(courseId, mode);
-    }catch(e){
-      console.error(e);
-      toast('Ошибка создания группы: '+(e?.message||e),'error');
-    }
-  });
-
-  listEl.addEventListener('click', async (ev)=>{
-    const btn = ev.target?.closest('button');
-    if(!btn) return;
-    const gid = btn.dataset.gid;
-    const act = btn.dataset.act;
-    const group = groups.find(g=>g.id===gid);
-    if(!group) return;
-
-    if(act==='apply'){
-      const set = new Set((group.memberIds||[]).map(String));
-      setCheckedStudentIds(listSelector, set);
-      toast('Группа применена','success');
-    } else if(act==='add'){
-      const addIds = getCheckedStudentIds(listSelector);
-      if(!addIds.length){ toast('Отметь студентов, которых добавить','error'); return; }
-      const merged = new Set([...(group.memberIds||[]).map(String), ...addIds.map(String)]);
-      try{
-        await createOrUpdateGroup(courseId, gid, group.name||'Группа', Array.from(merged));
-        toast('Группа обновлена','success');
-        await renderCourseGroupsUI(courseId, mode);
-      }catch(e){
-        console.error(e);
-        toast('Ошибка обновления группы: '+(e?.message||e),'error');
-      }
-    } else if(act==='del'){
-      if(!confirm('Удалить группу?')) return;
-      try{
-        await deleteGroup(courseId, gid);
-        toast('Группа удалена','success');
-        await renderCourseGroupsUI(courseId, mode);
-      }catch(e){
-        console.error(e);
-        toast('Ошибка удаления группы: '+(e?.message||e),'error');
-      }
-    }
-  });
-}
-
-// ══════════════════════════════════════════════════════════════
-//  ПОЛЬЗОВАТЕЛИ
-// ══════════════════════════════════════════════════════════════
-async function loadAdminUsers() {
-  const snap=await getDocs(collection(db,'users')); const list=$('admin-users-list'); list.innerHTML='';
-  if(snap.empty){list.innerHTML='<p class="empty-msg">Пользователей нет</p>';return;}
+// ═══════════════════════════════════════════════════════════════
+//  ПОЛЬЗОВАТЕЛИ (с группами)
+// ═══════════════════════════════════════════════════════════════
+async function loadAdminUsers(){
+  const snap = await getDocs(collection(db,'users'));
+  const list = $('admin-users-list'); list.innerHTML='';
+  if(snap.empty){ list.innerHTML='<p class="empty-msg">Пользователей нет</p>'; return; }
   snap.forEach(d=>{
-    const u=d.data(); const rl=u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
-    const card=document.createElement('div'); card.className='card';
-    card.innerHTML=`<div class="card-info"><h3>${esc(u.name||'—')}</h3><p>${esc(u.email)} · <span class="role-badge role-${u.role}">${rl}</span></p></div>
-      <div class="card-actions"><button class="btn btn-sm btn-ghost" onclick="deleteUser('${d.id}')">Удалить</button></div>`;
+    const u  = d.data();
+    const rl = u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
+    const grp= u.group ? ` · <span class="group-tag">${esc(u.group)}</span>` : '';
+    const card = document.createElement('div'); card.className='card';
+    const info = document.createElement('div'); info.className='card-info';
+    info.innerHTML=`<h3>${esc(u.name||'—')}</h3><p>${esc(u.email)} · <span class="role-badge role-${u.role}">${rl}</span>${grp}</p>`;
+    const actions = document.createElement('div'); actions.className='card-actions';
+    actions.appendChild(makeBtn('Удалить','btn-ghost',()=>deleteUser(d.id)));
+    card.appendChild(info); card.appendChild(actions);
     list.appendChild(card);
   });
 }
-$('btn-create-user').addEventListener('click',()=>$('modal-user').classList.remove('hidden'));
-$('btn-user-cancel').addEventListener('click',()=>$('modal-user').classList.add('hidden'));
-$('btn-user-save').addEventListener('click',async()=>{
-  const name=$('inp-user-name').value.trim(), email=$('inp-user-email').value.trim(),
-        pass=$('inp-user-pass').value, role=$('sel-user-role').value;
-  if(!name||!email||!pass){toast('Заполни все поля','error');return;}
-  try{
-    const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email,password:pass,returnSecureToken:false})
-    });
-    const data=await res.json();
-    if(data.error){toast('Ошибка: '+data.error.message,'error');return;}
-    await setDoc(doc(db,'users',data.localId),{name,email,role,createdAt:serverTimestamp()});
-    toast('Пользователь создан','success'); $('modal-user').classList.add('hidden');
-    ['inp-user-name','inp-user-email','inp-user-pass'].forEach(id=>$(id).value='');
-    loadAdminUsers();
-  }catch(e){toast('Ошибка: '+e.message,'error');}
-});
-window.deleteUser=async uid=>{ if(!confirm('Удалить?'))return; await deleteDoc(doc(db,'users',uid)); toast('Удалён'); loadAdminUsers(); };
 
-// ══════════════════════════════════════════════════════════════
+$('btn-create-user').addEventListener('click', ()=>openModal('modal-user'));
+$('btn-user-cancel').addEventListener('click', ()=>closeModal('modal-user'));
+$('btn-user-save').addEventListener('click', async ()=>{
+  const name  = $('inp-user-name').value.trim();
+  const email = $('inp-user-email').value.trim();
+  const pass  = $('inp-user-pass').value;
+  const role  = $('sel-user-role').value;
+  const group = $('inp-user-group').value.trim(); // необязательно
+  if(!name||!email||!pass){ toast('Заполни имя, email и пароль','error'); return; }
+  try{
+    const res  = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({email,password:pass,returnSecureToken:false})
+    });
+    const data = await res.json();
+    if(data.error){ toast('Ошибка Firebase: '+data.error.message,'error'); return; }
+    const profile = {name,email,role,createdAt:serverTimestamp()};
+    if(group) profile.group=group;
+    await setDoc(doc(db,'users',data.localId), profile);
+    toast('Пользователь создан ✓','success');
+    closeModal('modal-user');
+    ['inp-user-name','inp-user-email','inp-user-pass','inp-user-group'].forEach(id=>$(id).value='');
+    loadAdminUsers();
+  } catch(e){ toast('Ошибка: '+e.message,'error'); }
+});
+
+async function deleteUser(uid){
+  if(!confirm('Удалить пользователя из базы?')) return;
+  await deleteDoc(doc(db,'users',uid));
+  toast('Удалён из базы (учётная запись Auth остаётся — удали её в Firebase Console → Authentication)');
+  loadAdminUsers();
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  ОТВЕТЫ + ОЦЕНКИ (УЧИТЕЛЬ / ADMIN)
-// ══════════════════════════════════════════════════════════════
-async function loadTeacherAnswers() {
-  const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
-  const list=$('teacher-answers-list'); list.innerHTML='';
-  if(snap.empty){list.innerHTML='<p class="empty-msg">Ответов нет</p>';return;}
+// ═══════════════════════════════════════════════════════════════
+async function loadTeacherAnswers(){
+  const snap = await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
+  const list = $('teacher-answers-list'); list.innerHTML='';
+  if(snap.empty){ list.innerHTML='<p class="empty-msg">Ответов нет</p>'; return; }
   snap.forEach(d=>{
-    const a=d.data();
-    const sc=a.status==='checked'?'status-checked':'status-pending';
-    const sl=a.status==='checked'?'✅ Проверено':'⏳ На проверке';
-    const gh=a.grade?`<span class="grade-badge gc-${gradeColor(a.grade)}">${esc(a.grade)}</span>`:'';
-    const card=document.createElement('div'); card.className='card answer-card';
+    const a  = d.data();
+    const sc = a.status==='checked'?'status-checked':'status-pending';
+    const sl = a.status==='checked'?'✅ Проверено':'⏳ На проверке';
+    const gh = a.grade?`<span class="grade-badge gc-${gradeColor(a.grade)}">${esc(a.grade)}</span>`:'';
+    const card = document.createElement('div'); card.className='card answer-card';
     card.innerHTML=`
       <div class="answer-header">
         <div><strong>${esc(a.studentName||a.studentEmail)}</strong>
@@ -627,27 +571,31 @@ async function loadTeacherAnswers() {
           <label class="small-label">Комментарий</label>
           <textarea class="fb-input" id="fb-${d.id}" placeholder="Комментарий...">${esc(a.feedback||'')}</textarea>
         </div>
-        <button class="btn btn-primary fb-btn" onclick="saveFeedback('${d.id}')">Сохранить</button>
+        <button class="btn btn-primary fb-btn" data-id="${d.id}">Сохранить</button>
       </div>`;
+    // Вешаем обработчик на кнопку через addEventListener
+    card.querySelector('.fb-btn').addEventListener('click', async ()=>{
+      const feedback = $('fb-'+d.id).value;
+      const grade    = $('gs-'+d.id).value;
+      await updateDoc(doc(db,'answers',d.id),{feedback,grade,status:'checked',checkedAt:serverTimestamp(),checkedBy:currentUser.uid});
+      toast('Сохранено ✓','success'); loadTeacherAnswers();
+    });
     list.appendChild(card);
   });
 }
-window.saveFeedback=async id=>{
-  const feedback=$('fb-'+id).value, grade=$('gs-'+id).value;
-  await updateDoc(doc(db,'answers',id),{feedback,grade,status:'checked',checkedAt:serverTimestamp(),checkedBy:currentUser.uid});
-  toast('Сохранено','success'); loadTeacherAnswers();
-};
+
 $('answers-search').addEventListener('input',function(){
   const q=this.value.toLowerCase();
   document.querySelectorAll('.answer-card').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
 });
 
-// ── Журнал оценок ──
-async function loadGradesJournal() {
-  const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
-  const list=$('grades-list'); list.innerHTML=''; const by={};
+// ─── Журнал оценок ─────────────────────────────────────────────
+async function loadGradesJournal(){
+  const snap = await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
+  const list = $('grades-list'); list.innerHTML='';
+  const by   = {};
   snap.forEach(d=>{ const a=d.data(); if(!a.grade)return; const n=a.studentName||a.studentEmail; (by[n]=by[n]||[]).push(a); });
-  if(!Object.keys(by).length){list.innerHTML='<p class="empty-msg">Оценок нет</p>';return;}
+  if(!Object.keys(by).length){ list.innerHTML='<p class="empty-msg">Оценок нет</p>'; return; }
   Object.entries(by).forEach(([name,entries])=>{
     const sec=document.createElement('div'); sec.className='grade-section';
     sec.innerHTML=`<h3 class="grade-name">${esc(name)}</h3>`;
@@ -655,71 +603,79 @@ async function loadGradesJournal() {
       const row=document.createElement('div'); row.className='grade-row';
       row.innerHTML=`<span class="grade-topic">${esc(a.topicTitle||'—')}</span><span class="muted">${fmt(a.checkedAt)}</span><span class="grade-badge gc-${gradeColor(a.grade)}">${esc(a.grade)}</span>`;
       sec.appendChild(row);
-    }); list.appendChild(sec);
+    });
+    list.appendChild(sec);
   });
 }
 
-async function loadStudentGrades() {
-  const snap=await getDocs(query(collection(db,'answers'),where('studentId','==',currentUser.uid),orderBy('createdAt','desc')));
-  const list=$('my-grades-list'); list.innerHTML=''; let any=false;
-  snap.forEach(d=>{ const a=d.data(); if(!a.grade)return; any=true;
+async function loadStudentGrades(){
+  const snap = await getDocs(query(collection(db,'answers'),where('studentId','==',currentUser.uid),orderBy('createdAt','desc')));
+  const list = $('my-grades-list'); list.innerHTML=''; let any=false;
+  snap.forEach(d=>{
+    const a=d.data(); if(!a.grade) return; any=true;
     const row=document.createElement('div'); row.className='card';
     row.innerHTML=`<div class="card-info"><h3>${esc(a.topicTitle||'—')}</h3><p class="muted">${fmt(a.checkedAt)}</p>${a.feedback?`<p class="grade-fb">💬 ${esc(a.feedback)}</p>`:''}</div><span class="grade-badge grade-big gc-${gradeColor(a.grade)}">${esc(a.grade)}</span>`;
     list.appendChild(row);
   });
-  if(!any)list.innerHTML='<p class="empty-msg">Оценок пока нет</p>';
+  if(!any) list.innerHTML='<p class="empty-msg">Оценок пока нет</p>';
 }
 
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════
 //  СТУДЕНТ — КУРСЫ (только доступные)
-// ══════════════════════════════════════════════════════════════
-async function loadStudentCourses() {
-  const allSnap=await getDocs(collection(db,'courses'));
-  const list=$('student-courses-list'); list.innerHTML='';
-  const visible=[];
+// ═══════════════════════════════════════════════════════════════
+async function loadStudentCourses(){
+  const allSnap = await getDocs(collection(db,'courses'));
+  const list    = $('student-courses-list'); list.innerHTML='';
+  const visible = [];
   for(const d of allSnap.docs){
-    const e=await getDoc(doc(db,'courses',d.id,'enrollments',currentUser.uid));
+    const e = await getDoc(doc(db,'courses',d.id,'enrollments',currentUser.uid));
     if(e.exists()) visible.push({id:d.id,...d.data()});
   }
-  if(!visible.length){list.innerHTML='<p class="empty-msg">Тебе пока не открыт доступ ни к одному курсу</p>';return;}
+  if(!visible.length){ list.innerHTML='<p class="empty-msg">Тебе пока не открыт доступ ни к одному курсу</p>'; return; }
   visible.forEach(c=>{
     const card=document.createElement('div'); card.className='card clickable';
     card.innerHTML=`<div class="card-info"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div><div class="card-arrow">→</div>`;
-    card.addEventListener('click',()=>openStudentCourse(c.id,c.title)); list.appendChild(card);
+    card.addEventListener('click',()=>openStudentCourse(c.id,c.title));
+    list.appendChild(card);
   });
 }
 
-async function openStudentCourse(courseId,courseTitle) {
-  selectedCourseId=courseId; $('lbl-student-course').textContent=courseTitle;
-  await loadStudentTopics(courseId); show('screen-student-topics');
+async function openStudentCourse(courseId,courseTitle){
+  selectedCourseId=courseId;
+  $('lbl-student-course').textContent=courseTitle;
+  await loadStudentTopics(courseId);
+  show('screen-student-topics');
 }
 
-async function loadStudentTopics(courseId) {
-  const snap=await getDocs(collection(db,'courses',courseId,'topics'));
-  const list=$('student-topics-list'); list.innerHTML='';
-  const topics=[]; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
+async function loadStudentTopics(courseId){
+  const snap   = await getDocs(collection(db,'courses',courseId,'topics'));
+  const list   = $('student-topics-list'); list.innerHTML='';
+  const topics = []; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
   topics.sort((a,b)=>(a.order||0)-(b.order||0));
   for(const t of topics){
-    const aSnap=await getDoc(doc(db,'courses',courseId,'topics',t.id,'access',currentUser.uid));
-    const ok=aSnap.exists();
-    const qCount=(t.blocks||[]).filter(b=>b.type==='question').length;
-    const card=document.createElement('div'); card.className=`card ${ok?'clickable':'locked'}`;
-    card.innerHTML=`<div class="lock-icon">${ok?'📖':'🔒'}</div><div class="card-info"><h3>${esc(t.title)}</h3><p>${ok?(qCount?`${qCount} вопрос(а)`:'Материал для изучения'):'Заблокировано'}</p></div>`;
+    const aSnap  = await getDoc(doc(db,'courses',courseId,'topics',t.id,'access',currentUser.uid));
+    const ok     = aSnap.exists();
+    const qCount = (t.blocks||[]).filter(b=>b.type==='question').length;
+    const card   = document.createElement('div'); card.className=`card ${ok?'clickable':'locked'}`;
+    card.innerHTML=`<div class="lock-icon">${ok?'📖':'🔒'}</div><div class="card-info"><h3>${esc(t.title)}</h3><p>${ok?(qCount?`${qCount} вопрос(а) для ответа`:'Материал для изучения'):'Заблокировано'}</p></div>`;
     if(ok) card.addEventListener('click',()=>openStudentTopic(t));
     list.appendChild(card);
   }
 }
 
-// ── Открыть тему ──────────────────────────────────────────────
-async function openStudentTopic(topic) {
-  $('lbl-student-topic').textContent=topic.title;
-  const prevSnap=await getDocs(query(collection(db,'answers'),where('studentId','==',currentUser.uid),where('topicId','==',topic.id)));
+async function openStudentTopic(topic){
+  $('lbl-student-topic').textContent = topic.title;
+
+  const prevSnap = await getDocs(query(collection(db,'answers'),
+    where('studentId','==',currentUser.uid),
+    where('topicId','==',topic.id)
+  ));
   let prevData=null; prevSnap.forEach(d=>{prevData=d.data();});
 
   const container=$('topic-blocks'); container.innerHTML='';
   const questionBlocks=[];
 
-  (topic.blocks||[]).forEach((block,i)=>{
+  (topic.blocks||[]).forEach((block)=>{
     const el=document.createElement('div'); el.className='topic-block';
 
     if(block.type==='text'){
@@ -729,7 +685,7 @@ async function openStudentTopic(topic) {
       const url=(block.url||'').trim();
       if(url){
         el.innerHTML=`<img class="topic-img" src="${esc(url)}" alt="Изображение"
-          onerror="this.outerHTML='<div class=img-err>⚠️ Изображение не загружается. <a href=&quot;${esc(url)}&quot; target=&quot;_blank&quot;>Открыть ссылку</a></div>'"/>`;
+          onerror="this.outerHTML='<div class=img-err>⚠️ Картинка не загружается. <a href=&quot;${esc(url)}&quot; target=&quot;_blank&quot;>Открыть ссылку</a></div>'"/>`;
       }
 
     } else if(block.type==='video'){
@@ -748,7 +704,6 @@ async function openStudentTopic(topic) {
     container.appendChild(el);
   });
 
-  // Статус / кнопка
   const statusEl=$('topic-status'); statusEl.innerHTML='';
   if(questionBlocks.length){
     if(prevData?.status==='checked'){
@@ -766,19 +721,17 @@ async function openStudentTopic(topic) {
   show('screen-student-topic');
 }
 
-// ── Видео embed ───────────────────────────────────────────────
-function buildVideoEmbed(raw) {
+function buildVideoEmbed(raw){
   const wrap=document.createElement('div'); wrap.className='video-wrap';
   const u=raw.trim();
   if(!u){ wrap.classList.add('hidden'); return wrap; }
 
-  // Если это уже готовый iframe-код
+  // Уже готовый iframe-код (например скопированный из ВКонтакте)
   if(u.startsWith('<iframe')){
     const div=document.createElement('div'); div.className='video-iframe-wrap';
     div.innerHTML=u;
-    // Растягиваем iframe на всю ширину
     const iframe=div.querySelector('iframe');
-    if(iframe){ iframe.style.width='100%'; iframe.style.height='360px'; iframe.removeAttribute('width'); }
+    if(iframe){ iframe.style.width='100%'; iframe.style.height='360px'; iframe.removeAttribute('width'); iframe.removeAttribute('height'); }
     wrap.appendChild(div); return wrap;
   }
 
@@ -789,40 +742,46 @@ function buildVideoEmbed(raw) {
     return wrap;
   }
 
-  // ВКонтакте — ссылка на видео (vkvideo.ru или vk.com/video)
+  // ВКонтакте — ссылка вида vk.com/video-XXX_YYY или vkvideo.ru/video-XXX_YYY
   const vk=u.match(/video(-?\d+)_(\d+)/);
   if(vk){
     wrap.innerHTML=`<iframe src="https://vk.com/video_ext.php?oid=${vk[1]}&id=${vk[2]}&hd=2" frameborder="0" allow="autoplay;encrypted-media;fullscreen;picture-in-picture" allowfullscreen></iframe>`;
     return wrap;
   }
 
-  // Прямая ссылка .mp4
+  // Прямая ссылка на видеофайл
   if(u.match(/\.(mp4|webm|ogg)(\?|$)/i)){
     wrap.innerHTML=`<video controls><source src="${esc(u)}"/></video>`;
     return wrap;
   }
 
-  // Иначе — кнопка
+  // Всё остальное — кнопка
   wrap.innerHTML=`<div class="video-link"><div class="vl-icon">▶</div><a class="btn btn-primary" href="${esc(u)}" target="_blank">Открыть видео</a></div>`;
   return wrap;
 }
 
 async function submitAnswers(topic,questionBlocks){
-  const tas=document.querySelectorAll('#topic-blocks textarea.answer-ta');
-  const answers=Array.from(tas).map(t=>t.value.trim());
-  if(answers.some(a=>!a)){toast('Ответь на все вопросы','error');return;}
+  const tas    = document.querySelectorAll('#topic-blocks textarea.answer-ta');
+  const answers= Array.from(tas).map(t=>t.value.trim());
+  if(answers.some(a=>!a)){ toast('Ответь на все вопросы','error'); return; }
   await addDoc(collection(db,'answers'),{
-    studentId:currentUser.uid, studentEmail:currentUser.email,
-    studentName:userProfile.name||currentUser.email,
-    courseId:selectedCourseId, topicId:topic.id, topicTitle:topic.title,
-    questions:questionBlocks.map(b=>b.question), answers,
-    status:'pending', grade:'', createdAt:serverTimestamp()
+    studentId:    currentUser.uid,
+    studentEmail: currentUser.email,
+    studentName:  userProfile.name||currentUser.email,
+    courseId:     selectedCourseId,
+    topicId:      topic.id,
+    topicTitle:   topic.title,
+    questions:    questionBlocks.map(b=>b.question),
+    answers,
+    status: 'pending', grade: '',
+    createdAt: serverTimestamp()
   });
-  toast('Ответы отправлены!','success'); openStudentTopic(topic);
+  toast('Ответы отправлены! ✓','success');
+  openStudentTopic(topic);
 }
 
-$('btn-back-to-courses-s').addEventListener('click',()=>{ loadStudentCourses(); show('screen-student-courses'); });
-$('btn-back-to-topics-s').addEventListener('click', ()=>{ openStudentCourse(selectedCourseId,$('lbl-student-course').textContent); });
+$('btn-back-to-courses-s').addEventListener('click', ()=>{ loadStudentCourses(); show('screen-student-courses'); });
+$('btn-back-to-topics-s').addEventListener('click',  ()=>{ openStudentCourse(selectedCourseId,$('lbl-student-course').textContent); });
 
 </script>
 
@@ -830,8 +789,7 @@ $('btn-back-to-topics-s').addEventListener('click', ()=>{ openStudentCourse(sele
 :root{
   --ac:#2563EB;--ac-dk:#1D4ED8;--ac-lt:#EFF6FF;
   --bg:#F1F5F9;--sf:#fff;--br:#E2E8F0;
-  --tx:#0F172A;--mu:#64748B;
-  --green:#15803D;--red:#DC2626;
+  --tx:#0F172A;--mu:#64748B;--green:#15803D;--red:#DC2626;
   --rd:12px;--rds:8px;
   --sh:0 1px 6px rgba(0,0,0,.07);--shm:0 4px 20px rgba(0,0,0,.1);
 }
@@ -847,7 +805,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-hei
   display:flex;align-items:center;gap:.4rem;padding:.62rem 1.2rem;box-shadow:var(--sh);flex-wrap:wrap;}
 .nav-brand-wrap{display:flex;align-items:center;gap:.6rem;margin-right:auto;}
 .logo-img{height:32px;width:auto;display:none;border-radius:6px;object-fit:contain;}
-.logo-text{font-family:'Sora',sans-serif;font-size:1rem;font-weight:800;background:linear-gradient(135deg,var(--ac),#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.logo-text{font-family:'Sora',sans-serif;font-size:1rem;font-weight:800;
+  background:linear-gradient(135deg,var(--ac),#7C3AED);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 .nav-user-wrap{font-size:.8rem;color:var(--mu);}
 .nav-role-badge{font-size:.7rem;background:var(--ac-lt);color:var(--ac);border-radius:20px;padding:2px 8px;font-weight:600;}
 nav button{background:none;border:none;cursor:pointer;font-size:.8rem;color:var(--mu);padding:.3rem .6rem;border-radius:var(--rds);transition:background .15s;font-family:'Inter',sans-serif;font-weight:500;}
@@ -868,25 +827,26 @@ nav button:hover{background:var(--bg);color:var(--tx);}
 .fg{display:flex;flex-direction:column;gap:.28rem;margin-bottom:.8rem;}
 .fg label{font-size:.78rem;font-weight:600;color:var(--mu);}
 input[type=text],input[type=email],input[type=password],input[type=url],input[type=number],textarea,select{
-  font-family:'Inter',sans-serif;font-size:.9rem;padding:.56rem .8rem;border:1.5px solid var(--br);border-radius:var(--rds);background:var(--bg);color:var(--tx);transition:border-color .15s;width:100%;}
+  font-family:'Inter',sans-serif;font-size:.9rem;padding:.56rem .8rem;border:1.5px solid var(--br);
+  border-radius:var(--rds);background:var(--bg);color:var(--tx);transition:border-color .15s;width:100%;}
 input:focus,textarea:focus,select:focus{outline:none;border-color:var(--ac);background:var(--sf);}
 textarea{min-height:76px;resize:vertical;line-height:1.55;}
 
 /* BUTTONS */
 .btn{font-family:'Inter',sans-serif;font-size:.86rem;font-weight:600;padding:.52rem 1rem;border-radius:var(--rds);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .btn-sm{padding:.38rem .7rem;font-size:.78rem;}
-.btn-primary{background:var(--ac);color:#fff;} .btn-primary:hover{background:var(--ac-dk);}
-.btn-secondary{background:var(--ac-lt);color:var(--ac);} .btn-secondary:hover{background:#DBEAFE;}
-.btn-accent{background:#F0FDF4;color:var(--green);border:1px solid #BBF7D0;} .btn-accent:hover{background:#DCFCE7;}
-.btn-ghost{background:transparent;color:var(--mu);border:1.5px solid var(--br);} .btn-ghost:hover{color:var(--red);border-color:var(--red);}
+.btn-primary{background:var(--ac);color:#fff;}.btn-primary:hover{background:var(--ac-dk);}
+.btn-secondary{background:var(--ac-lt);color:var(--ac);}.btn-secondary:hover{background:#DBEAFE;}
+.btn-accent{background:#F0FDF4;color:var(--green);border:1px solid #BBF7D0;}.btn-accent:hover{background:#DCFCE7;}
+.btn-ghost{background:transparent;color:var(--mu);border:1.5px solid var(--br);}.btn-ghost:hover{color:var(--red);border-color:var(--red);}
 .btn-wide{width:100%;padding:.66rem;font-size:.95rem;margin-top:.4rem;}
 .btn-submit{width:100%;padding:.75rem;margin-top:1.5rem;}
 
 /* CARDS */
 .card{background:var(--sf);border:1px solid var(--br);border-radius:var(--rd);padding:.9rem 1.05rem;display:flex;align-items:center;gap:.85rem;margin-bottom:.55rem;box-shadow:var(--sh);transition:box-shadow .15s;}
-.card.clickable{cursor:pointer;} .card.clickable:hover{box-shadow:var(--shm);}
+.card.clickable{cursor:pointer;}.card.clickable:hover{box-shadow:var(--shm);}
 .card.locked{opacity:.55;background:#F8FAFC;}
-.card-info{flex:1;min-width:0;} .card-info h3{font-size:.93rem;font-weight:600;margin-bottom:.16rem;} .card-info p{font-size:.8rem;color:var(--mu);}
+.card-info{flex:1;min-width:0;}.card-info h3{font-size:.93rem;font-weight:600;margin-bottom:.16rem;}.card-info p{font-size:.8rem;color:var(--mu);}
 .card-actions{display:flex;gap:.38rem;flex-shrink:0;flex-wrap:wrap;}
 .card-arrow{font-size:1.15rem;color:var(--ac);}
 .lock-icon{font-size:1.3rem;flex-shrink:0;}
@@ -910,7 +870,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .block-header{display:flex;align-items:center;justify-content:space-between;padding:.5rem .85rem;background:var(--bg);border-bottom:1px solid var(--br);}
 .block-type{font-size:.78rem;font-weight:600;color:var(--mu);}
 .block-btns{display:flex;gap:.3rem;}
-.bbtn{background:none;border:1px solid var(--br);border-radius:5px;cursor:pointer;font-size:.75rem;padding:.18rem .45rem;color:var(--mu);transition:all .15s;font-family:'Inter',sans-serif;}
+.bbtn{background:none;border:1px solid var(--br);border-radius:5px;cursor:pointer;font-size:.75rem;padding:.18rem .45rem;color:var(--mu);font-family:'Inter',sans-serif;transition:all .15s;}
 .bbtn:hover{background:var(--bg);}
 .bbtn-del:hover{background:#FEE2E2;color:var(--red);border-color:var(--red);}
 .block-body{padding:.85rem;}
@@ -918,8 +878,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .block-textarea{width:100%;min-height:90px;}
 .block-textarea-sm{min-height:60px;}
 .block-input{width:100%;margin-bottom:.45rem;}
-.block-hint{font-size:.74rem;color:var(--mu);margin:.3rem 0;}
-.block-hint a{color:var(--ac);}
+.block-hint{font-size:.74rem;color:var(--mu);margin:.3rem 0;}.block-hint a{color:var(--ac);}
 .block-preview{max-width:100%;max-height:160px;border-radius:var(--rds);margin-top:.55rem;object-fit:contain;}
 .editor-footer{display:flex;gap:.65rem;justify-content:flex-end;margin-top:1.1rem;padding-top:.9rem;border-top:1px solid var(--br);}
 
@@ -930,7 +889,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .img-err{background:var(--bg);border:1px dashed var(--br);border-radius:var(--rd);padding:1.2rem;text-align:center;font-size:.85rem;color:var(--mu);}
 .video-wrap{border-radius:var(--rd);overflow:hidden;background:#000;aspect-ratio:16/9;width:100%;}
 .video-wrap iframe,.video-wrap video{width:100%;height:100%;display:block;}
-.video-iframe-wrap iframe{width:100%;height:360px;display:block;border:none;}
+.video-iframe-wrap{width:100%;}.video-iframe-wrap iframe{width:100%;height:360px;display:block;border:none;}
 .video-link{background:var(--bg);border:2px dashed var(--br);border-radius:var(--rd);padding:1.75rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.65rem;}
 .vl-icon{font-size:2.2rem;opacity:.35;}
 .q-block{background:var(--ac-lt);border-left:4px solid var(--ac);border-radius:0 var(--rd) var(--rd) 0;padding:.9rem 1rem;}
@@ -945,59 +904,45 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .answer-card{flex-direction:column;align-items:stretch;}
 .answer-header{display:flex;align-items:flex-start;justify-content:space-between;gap:.65rem;margin-bottom:.8rem;flex-wrap:wrap;}
 .status-badge{font-size:.7rem;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap;}
-.status-pending{background:#FEF3C7;color:#92400E;} .status-checked{background:#D1FAE5;color:#065F46;}
+.status-pending{background:#FEF3C7;color:#92400E;}.status-checked{background:#D1FAE5;color:#065F46;}
 .answer-qs{margin-bottom:.75rem;}
 .qa-block{background:var(--bg);border-radius:var(--rds);padding:.55rem .8rem;margin-bottom:.38rem;}
-.q-text{font-size:.77rem;color:var(--mu);margin-bottom:.18rem;} .a-text{font-size:.88rem;}
+.q-text{font-size:.77rem;color:var(--mu);margin-bottom:.18rem;}.a-text{font-size:.88rem;}
 .feedback-row{display:flex;gap:.65rem;align-items:flex-end;flex-wrap:wrap;padding-top:.7rem;border-top:1px solid var(--br);}
-.fb-left{flex:0 0 115px;} .fb-right{flex:1;min-width:140px;}
-.fb-input{min-height:52px;} .fb-btn{flex-shrink:0;align-self:flex-end;}
+.fb-left{flex:0 0 115px;}.fb-right{flex:1;min-width:140px;}
+.fb-input{min-height:52px;}.fb-btn{flex-shrink:0;align-self:flex-end;}
 .grade-select{padding:.45rem .6rem;}
 
 /* GRADES */
 .grade-badge{display:inline-block;font-size:.78rem;font-weight:700;padding:2px 9px;border-radius:20px;margin-left:.35rem;}
 .grade-big{font-size:1.05rem;padding:4px 13px;}
-.gc-green{background:#D1FAE5;color:#065F46;} .gc-blue{background:#DBEAFE;color:#1E40AF;}
-.gc-orange{background:#FEF3C7;color:#92400E;} .gc-red{background:#FEE2E2;color:#991B1B;}
-.gc-darkred{background:#450a0a;color:#fca5a5;} .gc-gray{background:#F3F4F6;color:#374151;}
+.gc-green{background:#D1FAE5;color:#065F46;}.gc-blue{background:#DBEAFE;color:#1E40AF;}
+.gc-orange{background:#FEF3C7;color:#92400E;}.gc-red{background:#FEE2E2;color:#991B1B;}
+.gc-darkred{background:#450a0a;color:#fca5a5;}.gc-gray{background:#F3F4F6;color:#374151;}
 .grade-section{margin-bottom:1.3rem;}
 .grade-name{font-size:.95rem;font-weight:700;color:var(--ac);margin-bottom:.45rem;}
 .grade-row{display:flex;align-items:center;gap:.7rem;padding:.48rem .7rem;background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);margin-bottom:.3rem;}
 .grade-topic{flex:1;font-size:.88rem;font-weight:500;}
 .grade-fb{font-size:.8rem;color:var(--mu);margin-top:.3rem;}
 
-/* ROLES / ACCESS */
+/* ROLES / ACCESS / GROUPS */
 .role-badge{font-size:.7rem;font-weight:700;padding:2px 7px;border-radius:20px;display:inline-block;}
-.role-admin{background:#EDE9FE;color:#5B21B6;} .role-teacher{background:#D1FAE5;color:#065F46;} .role-student{background:var(--ac-lt);color:var(--ac);}
+.role-admin{background:#EDE9FE;color:#5B21B6;}.role-teacher{background:#D1FAE5;color:#065F46;}.role-student{background:var(--ac-lt);color:var(--ac);}
+.group-tag{display:inline-block;font-size:.7rem;font-weight:600;background:#FEF3C7;color:#92400E;border-radius:20px;padding:1px 7px;margin-left:.3rem;}
 .access-row{padding:.55rem 0;border-bottom:1px solid var(--br);}
 .access-label{display:flex;align-items:center;gap:.55rem;cursor:pointer;}
-.access-label input{width:auto;flex-shrink:0;} .access-label span{font-weight:600;font-size:.88rem;}
+.access-label input{width:auto;flex-shrink:0;}.access-label span{font-weight:600;font-size:.88rem;}
 .access-label small{color:var(--mu);font-size:.77rem;margin-left:auto;}
-
-/* GROUPS */
-.groups-box{background:var(--bg);border:1px solid var(--br);border-radius:var(--rd);padding:.85rem;}
-.groups-head{display:flex;align-items:baseline;gap:.55rem;margin-bottom:.7rem;}
-.groups-actions{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.65rem;}
-.groups-actions input{flex:1;min-width:180px;}
-.groups-list{display:flex;flex-direction:column;gap:.45rem;}
-.group-row{background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);padding:.65rem .75rem;display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;}
-.group-info{flex:1;min-width:180px;}
-.group-name{font-weight:700;font-size:.88rem;}
-.group-btns{display:flex;gap:.35rem;flex-wrap:wrap;}
 
 /* SEARCH */
 .search-wrap{margin-bottom:.95rem;}
 
 /* TOAST */
 .toast{position:fixed;bottom:1.2rem;right:1.2rem;z-index:999;background:var(--tx);color:#fff;padding:.6rem 1rem;border-radius:var(--rds);font-size:.84rem;font-weight:500;box-shadow:var(--shm);animation:si .2s ease;}
-.toast-success{background:#15803D;} .toast-error{background:var(--red);}
+.toast-success{background:#15803D;}.toast-error{background:var(--red);}
 @keyframes si{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
 
-@media(max-width:600px){
-  .card{flex-wrap:wrap;} .card-actions{width:100%;}
-  .feedback-row{flex-direction:column;}
-  .fb-left,.fb-right{flex:1 1 100%;}
-}
+@media(max-width:600px){.card{flex-wrap:wrap;}.card-actions{width:100%;}.feedback-row{flex-direction:column;}.fb-left,.fb-right{flex:1 1 100%;}}
 </style>
 </head>
 <body>
@@ -1008,20 +953,17 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
     <img class="logo-img" src="" alt="logo"/>
     <span class="logo-text">Study Case Portal</span>
   </div>
-  <!-- Администратор -->
   <button id="nav-courses-a" class="hidden">Курсы</button>
   <button id="nav-users-a"   class="hidden">Пользователи</button>
   <button id="nav-answers-a" class="hidden">Ответы</button>
   <button id="nav-grades-a"  class="hidden">Журнал оценок</button>
-  <!-- Преподаватель -->
-  <button id="nav-courses-t" class="hidden">Курсы</button>
   <button id="nav-answers-t" class="hidden">Ответы студентов</button>
   <button id="nav-grades-t"  class="hidden">Журнал оценок</button>
-  <!-- Студент -->
   <button id="nav-courses-s" class="hidden">Мои курсы</button>
   <button id="nav-grades-s"  class="hidden">Мои оценки</button>
   <span class="nav-user-wrap">
-    <span id="nav-username"></span>&nbsp;·&nbsp;<span class="nav-role-badge" id="nav-role-badge"></span>
+    <span id="nav-username"></span>&nbsp;·&nbsp;
+    <span class="nav-role-badge" id="nav-role-badge"></span>
   </span>
   <button id="btn-logout">Выйти</button>
 </nav>
@@ -1086,7 +1028,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   <div id="admin-users-list"></div>
 </div>
 
-<!-- ═══ ОТВЕТЫ (УЧИТЕЛЬ) ══════════════════════════════════════ -->
+<!-- ═══ ОТВЕТЫ ════════════════════════════════════════════════ -->
 <div id="screen-teacher" class="screen hidden">
   <div class="ph"><h1>Ответы студентов</h1></div>
   <div class="search-wrap"><input type="text" id="answers-search" placeholder="🔍 Поиск по имени или теме..."/></div>
@@ -1099,7 +1041,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   <div id="grades-list"></div>
 </div>
 
-<!-- ═══ МОИ ОЦЕНКИ (СТУДЕНТ) ══════════════════════════════════ -->
+<!-- ═══ МОИ ОЦЕНКИ ════════════════════════════════════════════ -->
 <div id="screen-my-grades" class="screen hidden">
   <div class="ph"><h1>Мои оценки</h1></div>
   <div id="my-grades-list"></div>
@@ -1120,7 +1062,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   <div id="student-topics-list"></div>
 </div>
 
-<!-- ═══ СТУДЕНТ: ТЕМА ═══════════════════════════════════════════ -->
+<!-- ═══ СТУДЕНТ: ТЕМА ════════════════════════════════════════════ -->
 <div id="screen-student-topic" class="screen hidden">
   <div class="ph">
     <button class="back-btn" id="btn-back-to-topics-s">← К темам</button>
@@ -1130,7 +1072,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   <div id="topic-status"></div>
 </div>
 
-<!-- ═══ МОДАЛКА: КУРС ══════════════════════════════════════════ -->
+<!-- ═══ МОДАЛКА: НОВЫЙ КУРС ════════════════════════════════════ -->
 <div id="modal-course" class="modal-ov hidden">
   <div class="modal-box">
     <h2>Новый курс</h2>
@@ -1150,7 +1092,6 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
     <p class="muted" style="margin-bottom:.8rem">Курс: <strong id="lbl-course-access-title"></strong></p>
     <p style="font-size:.8rem;color:var(--mu);margin-bottom:.7rem">Отмеченные студенты видят этот курс:</p>
     <div id="course-access-list"></div>
-    <div id="course-access-groups" style="margin-top:1rem"></div>
     <div class="modal-actions" style="margin-top:1rem">
       <button class="btn btn-ghost" id="btn-course-access-cancel">Отмена</button>
       <button class="btn btn-primary" id="btn-course-access-save">Сохранить</button>
@@ -1165,7 +1106,6 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
     <p class="muted" style="margin-bottom:.8rem">Тема: <strong id="lbl-access-topic-name"></strong></p>
     <p style="font-size:.8rem;color:var(--mu);margin-bottom:.7rem">Отмеченные студенты могут открыть эту тему:</p>
     <div id="topic-access-list"></div>
-    <div id="topic-access-groups" style="margin-top:1rem"></div>
     <div class="modal-actions" style="margin-top:1rem">
       <button class="btn btn-ghost" id="btn-topic-access-cancel">Отмена</button>
       <button class="btn btn-primary" id="btn-topic-access-save">Сохранить</button>
@@ -1180,12 +1120,17 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
     <div class="fg"><label>Имя</label><input type="text" id="inp-user-name" placeholder="Иванов Иван"/></div>
     <div class="fg"><label>Email</label><input type="email" id="inp-user-email" placeholder="ivan@school.ru"/></div>
     <div class="fg"><label>Пароль</label><input type="password" id="inp-user-pass" placeholder="мин. 6 символов"/></div>
-    <div class="fg"><label>Роль</label>
+    <div class="fg">
+      <label>Роль</label>
       <select id="sel-user-role">
         <option value="student">Студент</option>
         <option value="teacher">Преподаватель</option>
         <option value="admin">Администратор</option>
       </select>
+    </div>
+    <div class="fg">
+      <label>Группа <span style="font-weight:400;color:var(--mu)">(необязательно, только для студентов)</span></label>
+      <input type="text" id="inp-user-group" placeholder="Например: Группа А, 2024, 10Б"/>
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btn-user-cancel">Отмена</button>

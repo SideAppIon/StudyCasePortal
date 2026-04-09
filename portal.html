@@ -41,7 +41,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-hei
 .anim-delay-4  {animation-delay:.28s}
 .anim-delay-5  {animation-delay:.35s}
 
-/* стаггер только через inline style в JS — не дублировать здесь */
+/* Карточки анимируются через JS-класс, добавляемый после вставки в DOM */
+.card.entering{animation:fadeUp .3s ease both;}
 
 /* ── NAV ───────────────────────────────────────────────── */
 #app-nav{position:sticky;top:0;z-index:100;background:var(--sf);
@@ -323,6 +324,34 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   .fbrow{flex-direction:column;}.fbl,.fbr{flex:1 1 100%;}
   .grade-add-form{flex-direction:column;}
 }
+
+/* ── FOOTER ─────────────────────────────────────────────── */
+#site-footer{
+  background:var(--sf);border-top:1px solid var(--br);
+  padding:.75rem 1.2rem;margin-top:2rem;
+  display:flex;justify-content:center;}
+.footer-inner{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;justify-content:center;}
+.footer-brand{font-size:.78rem;color:var(--mu);text-decoration:none;font-weight:500;
+  transition:color .15s;}
+.footer-brand:hover{color:var(--ac);}
+.footer-socials{display:flex;gap:.5rem;align-items:center;}
+.fsocial{display:inline-flex;align-items:center;gap:.3rem;font-size:.78rem;font-weight:600;
+  padding:.28rem .7rem;border-radius:20px;text-decoration:none;
+  transition:opacity .15s,transform .15s;}
+.fsocial:hover{opacity:.82;transform:translateY(-1px);}
+.fsocial-vk{background:#0077FF18;color:#0077FF;}
+.fsocial-tg{background:#2AABEE18;color:#0088cc;}
+.fsocial-link{background:var(--ac-lt);color:var(--ac);}
+
+/* ── SETTINGS BLOCKS ─────────────────────────────────────── */
+.settings-block{background:var(--sf);border:1px solid var(--br);border-radius:var(--rd);
+  padding:1.25rem 1.4rem;animation:fadeUp .3s ease both;}
+.settings-h2{font-family:'Sora',sans-serif;font-size:1rem;font-weight:700;margin-bottom:.75rem;}
+.toggle-row{display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.9rem;
+  padding:.3rem 0;}
+.toggle-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--ac);flex-shrink:0;}
+code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.82em;
+  border:1px solid var(--br);}
 </style>
 </head>
 <body>
@@ -413,18 +442,63 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 
 <!-- ═══ GRADE SETTINGS ══════════════════════════════════════════ -->
 <div id="screen-gr" class="screen hidden">
-  <div class="ph"><h1>Настройка оценок</h1></div>
-  <p class="muted" style="margin-bottom:1rem">Создавай свои оценки — они будут доступны преподавателям при проверке ответов.</p>
-  <div class="grade-add-form anim-fade-up">
-    <div class="fg"><label>Название оценки</label><input type="text" id="gr-name" placeholder="Отлично, Молодец, На переделку..."/></div>
-    <div class="fg" style="min-width:200px">
-      <label>Цвет</label>
-      <div class="color-swatches" id="gr-swatches"></div>
+  <div class="ph"><h1>Настройки</h1></div>
+
+  <!-- Оценки -->
+  <div class="settings-block">
+    <h2 class="settings-h2">🏅 Оценки</h2>
+    <p class="muted" style="margin-bottom:.9rem">Создавай свои оценки — преподаватели выбирают их при проверке ответов.</p>
+    <div class="grade-add-form anim-fade-up">
+      <div class="fg"><label>Название оценки</label><input type="text" id="gr-name" placeholder="Отлично, Молодец, На переделку..."/></div>
+      <div class="fg" style="min-width:200px"><label>Цвет</label><div class="color-swatches" id="gr-swatches"></div></div>
+      <button class="btn bp btn-sm" style="align-self:flex-end;margin-bottom:.28rem" id="gr-add">+ Добавить</button>
     </div>
-    <button class="btn bp btn-sm" style="align-self:flex-end;margin-bottom:.28rem" id="gr-add">+ Добавить</button>
+    <div class="grade-list" id="grade-list"></div>
   </div>
-  <div class="grade-list" id="grade-list"></div>
+
+  <!-- Логотип -->
+  <div class="settings-block" style="margin-top:1.5rem">
+    <h2 class="settings-h2">🖼 Логотип</h2>
+    <p class="muted" style="margin-bottom:.9rem">Положи <code>logo.png</code> рядом с <code>portal.html</code> в репозитории. Ниже можно отключить логотип на отдельных местах.</p>
+    <div style="display:flex;flex-direction:column;gap:.6rem">
+      <label class="toggle-row"><input type="checkbox" id="tog-logo-nav" checked/><span>Показывать логотип в шапке (навигация)</span></label>
+      <label class="toggle-row"><input type="checkbox" id="tog-logo-login" checked/><span>Показывать логотип на странице входа</span></label>
+    </div>
+    <button class="btn bp btn-sm" style="margin-top:.85rem" id="btn-save-logo-settings">Сохранить</button>
+  </div>
+
+  <!-- Социальные сети и ссылки -->
+  <div class="settings-block" style="margin-top:1.5rem">
+    <h2 class="settings-h2">🔗 Футер и социальные сети</h2>
+    <p class="muted" style="margin-bottom:.9rem">Отображается внизу каждой страницы для всех пользователей.</p>
+    <div class="fg"><label>ВКонтакте (ссылка)</label><input type="url" id="set-vk" placeholder="https://vk.com/yourgroup"/></div>
+    <div class="fg"><label>Telegram (ссылка)</label><input type="url" id="set-tg" placeholder="https://t.me/yourchannel"/></div>
+    <div class="fg"><label>Дополнительная ссылка</label><input type="url" id="set-link" placeholder="https://yoursite.ru"/></div>
+    <div class="fg"><label>Подпись к ссылке</label><input type="text" id="set-link-label" placeholder="Наш сайт"/></div>
+    <button class="btn bp btn-sm" id="btn-save-footer">Сохранить</button>
+  </div>
+
+  <!-- Правила Firebase -->
+  <div class="settings-block" style="margin-top:1.5rem;background:#FFFBEB;border-color:#FDE68A">
+    <h2 class="settings-h2">⚠️ Добавь в Firestore Rules</h2>
+    <p class="muted" style="margin-bottom:.75rem;font-size:.82rem">Для сохранения настроек нужно добавить в правила Firebase → Firestore → Rules:</p>
+    <pre style="background:var(--bg);padding:.9rem;border-radius:8px;font-size:.75rem;overflow-x:auto;border:1px solid var(--br)">match /settings/{doc} {
+  allow read: if request.auth != null;
+  allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+}
+
+match /grades/{doc} {
+  allow read: if request.auth != null;
+  allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+}
+
+match /groups/{doc} {
+  allow read: if request.auth != null;
+  allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+}</pre>
+  </div>
 </div>
+
 
 <!-- ═══ TEACHER ANSWERS ══════════════════════════════════════════ -->
 <div id="screen-ta" class="screen hidden">
@@ -536,6 +610,14 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   </div>
 </div>
 
+<!-- ═══ FOOTER ════════════════════════════════════════════════ -->
+<footer id="site-footer">
+  <div class="footer-inner">
+    <div class="footer-socials" id="footer-socials"></div>
+    <a class="footer-brand" href="https://studycaseplatform.ru" target="_blank">studycaseplatform.ru</a>
+  </div>
+</footer>
+
 <!-- ═══════════════════════════════════════════════════════════
      MAIN SCRIPT — в конце body, все элементы уже существуют
      ════════════════════════════════════════════════════════════ -->
@@ -560,10 +642,12 @@ const auth = getAuth(app);
 const db   = getFirestore(app);
 
 // ── Logo from root ─────────────────────────────────────────────
-// Пробуем загрузить logo.PNG (регистронезависимо через два варианта)
 function applyLogo(src){
-  document.querySelectorAll('.logo-img').forEach(e=>{e.src=src;e.style.display='block';});
-  document.querySelectorAll('.logo-text').forEach(e=>e.style.display='none');
+  // Сначала ставим src всем, потом applyLogoVisibility скорректирует видимость
+  document.querySelectorAll('.logo-img').forEach(e=>{ e.src=src; e.dataset.loaded='1'; });
+  document.querySelectorAll('.logo-text').forEach(e=>e.dataset.hasLogo='1');
+  // Применяем видимость если настройки уже загружены
+  applyLogoVisibility();
 }
 (function tryLogo(names,i){
   if(i>=names.length)return;
@@ -584,13 +668,7 @@ const esc = s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(
 const fmt = ts=>{if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});};
 
 function show(id){
-  document.querySelectorAll('.screen').forEach(s=>{
-    if(!s.classList.contains('hidden')){
-      // Убираем анимации у всех карточек скрываемого экрана
-      s.querySelectorAll('[style*="animation"]').forEach(el=>el.style.animation='none');
-    }
-    s.classList.add('hidden');
-  });
+  document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));
   $(id)?.classList.remove('hidden');
   window.scrollTo(0,0);
 }
@@ -601,6 +679,15 @@ function toast(msg,type=''){
   t.className='toast '+(type==='ok'?'tok':type==='err'?'terr':'tinfo');
   t.textContent=msg;document.body.appendChild(t);
   setTimeout(()=>{t.style.animation='fadeIn .2s ease reverse';setTimeout(()=>t.remove(),200);},3300);
+}
+
+// animCard — вставляет карточку в список И запускает анимацию ровно один раз
+// delay в секундах, например 0.06 * i
+function animCard(parent, el, delay=0){
+  el.style.animationDelay = delay+'s';
+  parent.appendChild(el);
+  // Двойной rAF гарантирует что браузер видит элемент в DOM перед добавлением класса
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('entering')));
 }
 
 // ── State ──────────────────────────────────────────────────────
@@ -640,7 +727,7 @@ onAuthStateChanged(auth,async user=>{
   const snap=await getDoc(doc(db,'users',user.uid));
   if(!snap.exists()){await signOut(auth);show('screen-login');toast('Пользователь не найден','err');return;}
   CU=user;UP=snap.data();
-  await Promise.all([loadGradesCache(),loadGroupsCache()]);
+  await Promise.all([loadGradesCache(),loadGroupsCache(),loadSiteSettings()]);
   applyNav();
   if(UP.role==='admin')       {await loadCourses();show('screen-ac');}
   else if(UP.role==='teacher'){await loadAnswers();show('screen-ta');}
@@ -680,7 +767,6 @@ function applyNav(){
 $('nca').onclick=()=>{loadCourses();show('screen-ac');};
 $('nua').onclick=()=>{loadUsers();show('screen-au');};
 $('ngrpa').onclick=()=>{loadGroups();show('screen-grp');};
-$('ngra').onclick=()=>{renderGradeSettings();show('screen-gr');};
 $('naa').onclick=()=>{loadAnswers();show('screen-ta');};
 $('nga').onclick=()=>{loadGrades();show('screen-gj');};
 $('nat').onclick=()=>{loadAnswers();show('screen-ta');};
@@ -754,13 +840,13 @@ async function loadGroups(){
   if(!GROUPS.length){list.innerHTML='<p class="empty">Групп нет. Создай первую!</p>';return;}
   GROUPS.forEach((g,gi)=>{
     const card=document.createElement('div');card.className='card';
-    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${gi*0.06}s`;
+        card.style.animationDelay=(gi*0.06)+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(g.name)}</h3><p>${esc(g.description||'')}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="editgrp" data-id="${g.id}" data-name="${esc(g.name)}" data-desc="${esc(g.description||'')}">✏ Изменить</button>
         <button class="btn bg btn-sm" data-action="delgrp" data-id="${g.id}">Удалить</button>
       </div>`;
-    list.appendChild(card);
+    animCard(list, card);
   });
 }
 
@@ -813,37 +899,46 @@ function fillGroupSelect(){
 }
 
 // ── Group tabs helper — множественный выбор групп ──────────────
-// checkedSet — Set uid-ов которые уже имеют доступ (чекбоксы будут checked)
-// filterFn(uid) — дополнительный фильтр (например enrolled в курс)
+// КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: состояние чекбоксов хранится в Map accessMap{uid->bool}
+// а не читается из DOM — это позволяет переключать фильтры без потери данных
 function buildGroupTabs(containerId,listId,allStudents,checkedSet,filterFn){
   const tabsEl=$(containerId); tabsEl.innerHTML='';
   const listEl=$(listId);
 
+  // accessMap хранит итоговое состояние: uid -> true/false
+  // Инициализируем из checkedSet
+  const accessMap = new Map();
+  allStudents.forEach(([uid])=>{ accessMap.set(uid, checkedSet.has(uid)); });
+
   // Активные группы — Set id-ов. Пусто = показываем всех
-  const activeGroups=new Set();
+  const activeGroups = new Set();
 
   function render(){
-    listEl.innerHTML='';
-    let shown=0;
+    listEl.innerHTML = '';
+    let shown = 0;
     allStudents.forEach(([uid,u])=>{
       if(!filterFn(uid)) return;
-      // Если выбраны конкретные группы — показываем только их студентов
       if(activeGroups.size>0 && !activeGroups.has(u.groupId||'')) return;
       shown++;
-      const row=document.createElement('div'); row.className='arow';
-      const grp=u.groupName?` <span class="grptag">${esc(u.groupName)}</span>`:'';
+      const row = document.createElement('div'); row.className='arow';
+      const grp = u.groupName ? ` <span class="grptag">${esc(u.groupName)}</span>` : '';
+      const checked = accessMap.get(uid) ? 'checked' : '';
       row.innerHTML=`<label class="albl">
-        <input type="checkbox" data-uid="${uid}" ${checkedSet.has(uid)?'checked':''}/>
+        <input type="checkbox" data-uid="${uid}" ${checked}/>
         <span class="aname">${esc(u.name||u.email)}${grp}</span>
         <small>${esc(u.email)}</small>
       </label>`;
+      // Слушаем изменение чекбокса — сразу пишем в Map
+      row.querySelector('input').addEventListener('change', function(){
+        accessMap.set(uid, this.checked);
+      });
       listEl.appendChild(row);
     });
     if(!shown) listEl.innerHTML='<p class="empty" style="padding:1rem">Нет студентов</p>';
   }
 
   // Кнопка "Все"
-  const allBtn=document.createElement('button');
+  const allBtn = document.createElement('button');
   allBtn.className='gtab active'; allBtn.textContent='Все';
   allBtn.addEventListener('click',()=>{
     activeGroups.clear();
@@ -853,39 +948,36 @@ function buildGroupTabs(containerId,listId,allStudents,checkedSet,filterFn){
   });
   tabsEl.appendChild(allBtn);
 
-  // Кнопки групп — можно активировать несколько
+  // Кнопки групп — можно нажать несколько
   GROUPS.forEach(g=>{
-    const btn=document.createElement('button');
+    const btn = document.createElement('button');
     btn.className='gtab'; btn.textContent=g.name;
     btn.addEventListener('click',()=>{
-      if(activeGroups.has(g.id)){
-        activeGroups.delete(g.id);
-        btn.classList.remove('active');
-      } else {
-        activeGroups.add(g.id);
-        btn.classList.add('active');
-      }
-      // Если ни одна группа не выбрана — переключаемся на "Все"
-      if(activeGroups.size===0){
-        allBtn.classList.add('active');
-      } else {
-        allBtn.classList.remove('active');
-      }
+      if(activeGroups.has(g.id)){ activeGroups.delete(g.id); btn.classList.remove('active'); }
+      else                       { activeGroups.add(g.id);    btn.classList.add('active'); }
+      if(activeGroups.size===0) allBtn.classList.add('active');
+      else                      allBtn.classList.remove('active');
       render();
     });
     tabsEl.appendChild(btn);
   });
 
-  // Кнопка "Отметить всех видимых"
-  const selAllBtn=document.createElement('button');
+  // Кнопка "Выбрать всех видимых"
+  const selAllBtn = document.createElement('button');
   selAllBtn.className='gtab'; selAllBtn.textContent='☑ Выбрать всех';
   selAllBtn.style.marginLeft='auto';
   selAllBtn.addEventListener('click',()=>{
-    listEl.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=true);
+    // Отмечаем только видимых студентов
+    listEl.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.checked=true; accessMap.set(cb.dataset.uid, true);
+    });
   });
   tabsEl.appendChild(selAllBtn);
 
   render();
+
+  // Возвращаем accessMap чтобы save-обработчики могли его читать
+  return accessMap;
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -898,14 +990,14 @@ async function loadCourses(){
   snap.forEach((d,i)=>{
     const c=d.data();
     const card=document.createElement('div');card.className='card';
-    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.06}s`;
+        card.style.animationDelay=(i*0.06)+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="topics" data-id="${d.id}" data-title="${esc(c.title)}">Темы</button>
         <button class="btn ba btn-sm" data-action="caccess" data-id="${d.id}" data-title="${esc(c.title)}">Доступ</button>
         <button class="btn bg btn-sm" data-action="delcourse" data-id="${d.id}">Удалить</button>
       </div>`;
-    list.appendChild(card);
+    animCard(list, card);
   });
 }
 $('list-ac').addEventListener('click',async e=>{
@@ -925,31 +1017,31 @@ $('nc-save').onclick=async()=>{
 };
 
 // ── Course access ──────────────────────────────────────────────
+let caAccessMap = null; // хранит Map uid->bool для модалки курса
 async function openCourseAccess(courseId,courseTitle){
-  ACID=courseId;$('ca-name').textContent=courseTitle;
+  ACID=courseId; $('ca-name').textContent=courseTitle;
   const[usersSnap,enrollSnap]=await Promise.all([
     getDocs(query(collection(db,'users'),where('role','==','student'))),
     getDocs(collection(db,'courses',courseId,'enrollments'))
   ]);
-  const enrolled=new Set();enrollSnap.forEach(d=>enrolled.add(d.id));
-  const students=[];usersSnap.forEach(d=>students.push([d.id,d.data()]));
-  buildGroupTabs('ca-tabs','ca-list',students,enrolled,()=>true);
+  const enrolled=new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
+  const students=[]; usersSnap.forEach(d=>students.push([d.id,d.data()]));
+  caAccessMap = buildGroupTabs('ca-tabs','ca-list',students,enrolled,()=>true);
   mshow('m-ca');
 }
 $('ca-cancel').onclick=()=>mhide('m-ca');
 $('ca-save').onclick=async()=>{
-  const cbs=[...$('ca-list').querySelectorAll('input[type=checkbox]')];
-  // Сохраняем только видимые чекбоксы (текущий фильтр)
-  // Сначала читаем все текущие enrolled, потом применяем изменения
-  const enrollSnap=await getDocs(collection(db,'courses',ACID,'enrollments'));
-  const currentEnrolled=new Set();enrollSnap.forEach(d=>currentEnrolled.add(d.id));
-  const ops=[];
-  cbs.forEach(cb=>{
-    const r=doc(db,'courses',ACID,'enrollments',cb.dataset.uid);
-    if(cb.checked&&!currentEnrolled.has(cb.dataset.uid))ops.push(setDoc(r,{at:serverTimestamp()}));
-    if(!cb.checked&&currentEnrolled.has(cb.dataset.uid))ops.push(deleteDoc(r));
-  });
-  try{await Promise.all(ops);toast('Доступ к курсу сохранён ✓','ok');}catch(e){toast('Ошибка: '+e.message,'err');}
+  if(!caAccessMap){ mhide('m-ca'); return; }
+  try{
+    const ops=[];
+    caAccessMap.forEach((checked,uid)=>{
+      const r=doc(db,'courses',ACID,'enrollments',uid);
+      if(checked) ops.push(setDoc(r,{at:serverTimestamp()}));
+      else        ops.push(deleteDoc(r));
+    });
+    await Promise.all(ops);
+    toast('Доступ к курсу сохранён ✓','ok');
+  }catch(e){ toast('Ошибка: '+e.message,'err'); }
   mhide('m-ca');
 };
 
@@ -965,14 +1057,14 @@ async function loadTopics(){
   topics.forEach((t,i)=>{
     const bc=(t.blocks||[]).length;
     const card=document.createElement('div');card.className='card';
-    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.06}s`;
+        card.style.animationDelay=(i*0.06)+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${bc}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="edittopic" data-id="${t.id}">✏ Редактировать</button>
         <button class="btn ba btn-sm" data-action="taccess" data-id="${t.id}" data-title="${esc(t.title)}">🔓 Доступ</button>
         <button class="btn bg btn-sm" data-action="deltopic" data-id="${t.id}">Удалить</button>
       </div>`;
-    list.appendChild(card);
+    animCard(list, card);
   });
 }
 $('list-at').addEventListener('click',async e=>{
@@ -1070,21 +1162,23 @@ async function openTopicAccess(topicId,topicTitle){
     mshow('m-ta');return;
   }
   const students=[];usersSnap.forEach(d=>{if(enrolled.has(d.id))students.push([d.id,d.data()]);});
-  buildGroupTabs('ta-tabs','ta-list',students,allowed,uid=>enrolled.has(uid));
+  taAccessMap = buildGroupTabs('ta-tabs','ta-list',students,allowed,uid=>enrolled.has(uid));
   mshow('m-ta');
 }
+let taAccessMap = null;
 $('ta-cancel').onclick=()=>mhide('m-ta');
 $('ta-save').onclick=async()=>{
-  const cbs=[...$('ta-list').querySelectorAll('input[type=checkbox]')];
-  const accessSnap=await getDocs(collection(db,'courses',CID,'topics',ATID,'access'));
-  const cur=new Set();accessSnap.forEach(d=>cur.add(d.id));
-  const ops=[];
-  cbs.forEach(cb=>{
-    const r=doc(db,'courses',CID,'topics',ATID,'access',cb.dataset.uid);
-    if(cb.checked&&!cur.has(cb.dataset.uid))ops.push(setDoc(r,{at:serverTimestamp()}));
-    if(!cb.checked&&cur.has(cb.dataset.uid))ops.push(deleteDoc(r));
-  });
-  try{await Promise.all(ops);toast('Доступ к теме сохранён ✓','ok');}catch(e){toast('Ошибка: '+e.message,'err');}
+  if(!taAccessMap){ mhide('m-ta'); return; }
+  try{
+    const ops=[];
+    taAccessMap.forEach((checked,uid)=>{
+      const r=doc(db,'courses',CID,'topics',ATID,'access',uid);
+      if(checked) ops.push(setDoc(r,{at:serverTimestamp()}));
+      else        ops.push(deleteDoc(r));
+    });
+    await Promise.all(ops);
+    toast('Доступ к теме сохранён ✓','ok');
+  }catch(e){ toast('Ошибка: '+e.message,'err'); }
   mhide('m-ta');
 };
 
@@ -1104,7 +1198,7 @@ async function loadUsers(){
       const rl=u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
       const grp=u.groupName?` <span class="grptag">${esc(u.groupName)}</span>`:'';
       const card=document.createElement('div');card.className='card';
-      card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.04}s`;
+          card.style.animationDelay=(i*0.04)+'s';
       card.innerHTML=`<div class="ci"><h3>${esc(u.name||'—')}</h3>
         <p>${esc(u.email)} · <span class="rbadge r${u.role[0]}">${rl}</span>${grp}</p></div>
         <div class="ca">
@@ -1112,7 +1206,7 @@ async function loadUsers(){
           <button class="btn bw btn-sm" data-action="resetpw"  data-id="${u.id}" data-name="${esc(u.name||u.email)}">🔑 Пароль</button>
           <button class="btn bg btn-sm" data-action="deluser"  data-id="${u.id}">Удалить</button>
         </div>`;
-      list.appendChild(card);
+      animCard(list, card);
     });
   }
   render();
@@ -1209,7 +1303,7 @@ async function loadAnswers(){
     const savedGrade=GRADES.find(g=>g.id===a.gradeId);
     const gh=savedGrade?gradeChip(savedGrade):'';
     const card=document.createElement('div');card.className='card acard';
-    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.04}s`;
+        card.style.animationDelay=(i*0.04)+'s';
 
     // Build grade options
     const gradeOpts=GRADES.map(g=>`<option value="${g.id}" ${a.gradeId===g.id?'selected':''}>${esc(g.label)}</option>`).join('');
@@ -1236,7 +1330,7 @@ async function loadAnswers(){
         </div>
         <button class="btn bp fbbtn" data-aid="${d.id}">Сохранить</button>
       </div>`;
-    list.appendChild(card);
+    animCard(list, card);
   });
 }
 $('list-ta').addEventListener('click',async e=>{
@@ -1277,7 +1371,7 @@ async function loadGrades(){
     pending.forEach(a=>{const n=a.studentName||a.studentEmail;(byStudent[n]=byStudent[n]||[]).push(a);});
     Object.entries(byStudent).forEach(([name,entries],si)=>{
       const sec=document.createElement('div');sec.className='gsec';
-      sec.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${si*0.05}s`;
+          sec.style.animationDelay=(si*0.05)+'s';
       sec.innerHTML=`<h3 class="gname">${esc(name)}</h3>`;
       entries.forEach(a=>{
         const row=document.createElement('div');row.className='grow';
@@ -1299,7 +1393,7 @@ async function loadGrades(){
     checked.forEach(a=>{const n=a.studentName||a.studentEmail;(byStudent[n]=byStudent[n]||[]).push(a);});
     Object.entries(byStudent).forEach(([name,entries],si)=>{
       const sec=document.createElement('div');sec.className='gsec';
-      sec.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${si*0.05}s`;
+          sec.style.animationDelay=(si*0.05)+'s';
       sec.innerHTML=`<h3 class="gname">${esc(name)}</h3>`;
       entries.forEach(a=>{
         const g=GRADES.find(x=>x.id===a.gradeId);
@@ -1327,11 +1421,11 @@ async function loadMyGrades(){
     list.appendChild(hdr);
     pending.forEach((a,i)=>{
       const card=document.createElement('div');card.className='card';
-      card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.05}s`;
+          card.style.animationDelay=(i*0.05)+'s';
       card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
         <p class="muted">${fmt(a.createdAt)}</p></div>
         <span class="sbadge spend">⏳ На проверке</span>`;
-      list.appendChild(card);
+      animCard(list, card);
     });
   }
 
@@ -1342,12 +1436,12 @@ async function loadMyGrades(){
     checked.forEach((a,i)=>{
       const g=GRADES.find(x=>x.id===a.gradeId);
       const card=document.createElement('div');card.className='card';
-      card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.05}s`;
+          card.style.animationDelay=(i*0.05)+'s';
       card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
         <p class="muted">${fmt(a.checkedAt)}</p>
         ${a.feedback?`<p class="gfb">💬 ${esc(a.feedback)}</p>`:''}</div>
         ${g?gradeChip(g,true):''}`;
-      list.appendChild(card);
+      animCard(list, card);
     });
   }
 }
@@ -1367,10 +1461,10 @@ async function loadMyCourses(){
   if(!visible.length){list.innerHTML='<p class="empty">Тебе пока не открыт доступ ни к одному курсу</p>';return;}
   visible.forEach((c,i)=>{
     const card=document.createElement('div');card.className='card clk';
-    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.07}s`;
+        card.style.animationDelay=(i*0.07)+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div><div class="carrow">→</div>`;
     card.addEventListener('click',()=>openCourse(c.id,c.title));
-    list.appendChild(card);
+    animCard(list, card);
   });
 }
 async function openCourse(courseId,courseTitle){
@@ -1388,12 +1482,12 @@ async function loadMyTopics(courseId){
     const ok=aSnap.exists();
     const qc=(t.blocks||[]).filter(b=>b.type==='question').length;
     const card=document.createElement('div');card.className=`card ${ok?'clk':'locked'}`;
-    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${ti*0.06}s`;
+        card.style.animationDelay=(ti*0.06)+'s';
     card.innerHTML=`<div class="licon">${ok?'📖':'🔒'}</div>
       <div class="ci"><h3>${esc(t.title)}</h3>
       <p>${ok?(qc?`${qc} вопрос(а)`:'Материал для изучения'):'Заблокировано'}</p></div>`;
     if(ok)card.addEventListener('click',()=>openTopicView(t));
-    list.appendChild(card);
+    animCard(list, card);
   }
 }
 async function openTopicView(topic){
@@ -1474,6 +1568,96 @@ async function submitAnswers(topic,qblocks){
 }
 $('back-st').onclick=()=>{loadMyCourses();show('screen-sc');};
 $('back-sv').onclick=()=>{openCourse(CID,$('lbl-sc').textContent);};
+
+// ═══════════════════════════════════════════════════════════════
+//  SETTINGS — footer social links + logo visibility
+// ═══════════════════════════════════════════════════════════════
+let SITE_SETTINGS = { vk:'', tg:'', link:'', linkLabel:'', logoNav:true, logoLogin:true };
+
+async function loadSiteSettings(){
+  try{
+    const snap = await getDoc(doc(db,'settings','site'));
+    if(snap.exists()) SITE_SETTINGS = {...SITE_SETTINGS,...snap.data()};
+  }catch(e){}
+  applyLogoVisibility();
+  renderFooter();
+}
+
+function applyLogoVisibility(){
+  const navLogoOk    = SITE_SETTINGS.logoNav    !== false;
+  const loginLogoOk  = SITE_SETTINGS.logoLogin  !== false;
+
+  // Шапка
+  document.querySelectorAll('#app-nav .logo-img').forEach(e=>{
+    e.style.display = (navLogoOk && e.dataset.loaded) ? 'block' : 'none';
+  });
+  document.querySelectorAll('#app-nav .logo-text').forEach(e=>{
+    e.style.display = (navLogoOk && e.dataset.hasLogo) ? 'none' : '';
+  });
+  // Страница входа
+  document.querySelectorAll('.llogo .logo-img').forEach(e=>{
+    e.style.display = (loginLogoOk && e.dataset.loaded) ? 'block' : 'none';
+  });
+  document.querySelectorAll('.llogo .logo-text').forEach(e=>{
+    e.style.display = (loginLogoOk && e.dataset.hasLogo) ? 'none' : '';
+  });
+}
+
+function renderFooter(){
+  const soc = $('footer-socials'); soc.innerHTML='';
+  if(SITE_SETTINGS.vk){
+    const a=document.createElement('a'); a.className='fsocial fsocial-vk';
+    a.href=SITE_SETTINGS.vk; a.target='_blank';
+    a.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.785 16.241s.288-.032.436-.194c.136-.148.132-.427.132-.427s-.02-1.304.585-1.496c.598-.19 1.365 1.26 2.179 1.818.615.422 1.082.33 1.082.33l2.175-.03s1.137-.07.598-1.023c-.044-.075-.314-.662-1.616-1.872-1.364-1.266-1.182-1.062.462-3.253.999-1.333 1.398-2.146 1.272-2.494-.12-.332-.855-.244-.855-.244l-2.447.015s-.181-.025-.316.056c-.132.079-.217.262-.217.262s-.387 1.035-.903 1.913c-1.088 1.85-1.523 1.949-1.7 1.835-.414-.267-.31-1.075-.31-1.648 0-1.793.272-2.54-.529-2.733-.266-.065-.461-.107-1.141-.114-.872-.01-1.61.002-2.028.208-.278.136-.492.439-.361.456.161.022.526.099.72.362.25.338.241 1.099.241 1.099s.144 2.11-.335 2.372c-.329.18-.78-.187-1.748-1.865-.497-.858-.873-1.808-.873-1.808s-.072-.176-.202-.271c-.157-.115-.376-.151-.376-.151l-2.325.015s-.349.01-.477.162c-.113.135-.009.414-.009.414s1.822 4.265 3.882 6.415c1.89 1.974 4.037 1.843 4.037 1.843h.972z"/></svg> ВКонтакте';
+    soc.appendChild(a);
+  }
+  if(SITE_SETTINGS.tg){
+    const a=document.createElement('a'); a.className='fsocial fsocial-tg';
+    a.href=SITE_SETTINGS.tg; a.target='_blank';
+    a.innerHTML='<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.447 1.394c-.16.16-.295.295-.605.295l.213-3.053 5.56-5.023c.242-.213-.054-.333-.373-.12l-6.871 4.326-2.962-.924c-.643-.204-.657-.643.136-.953l11.57-4.461c.537-.194 1.006.131.833.941z"/></svg> Telegram';
+    soc.appendChild(a);
+  }
+  if(SITE_SETTINGS.link){
+    const a=document.createElement('a'); a.className='fsocial fsocial-link';
+    a.href=SITE_SETTINGS.link; a.target='_blank';
+    a.textContent = SITE_SETTINGS.linkLabel||SITE_SETTINGS.link;
+    soc.appendChild(a);
+  }
+}
+
+function fillSettingsForm(){
+  $('set-vk').value   = SITE_SETTINGS.vk||'';
+  $('set-tg').value   = SITE_SETTINGS.tg||'';
+  $('set-link').value = SITE_SETTINGS.link||'';
+  $('set-link-label').value = SITE_SETTINGS.linkLabel||'';
+  $('tog-logo-nav').checked   = SITE_SETTINGS.logoNav !== false;
+  $('tog-logo-login').checked = SITE_SETTINGS.logoLogin !== false;
+}
+
+$('btn-save-footer').onclick = async()=>{
+  SITE_SETTINGS.vk        = $('set-vk').value.trim();
+  SITE_SETTINGS.tg        = $('set-tg').value.trim();
+  SITE_SETTINGS.link      = $('set-link').value.trim();
+  SITE_SETTINGS.linkLabel = $('set-link-label').value.trim();
+  await setDoc(doc(db,'settings','site'), SITE_SETTINGS, {merge:true});
+  renderFooter();
+  toast('Футер сохранён ✓','ok');
+};
+
+$('btn-save-logo-settings').onclick = async()=>{
+  SITE_SETTINGS.logoNav   = $('tog-logo-nav').checked;
+  SITE_SETTINGS.logoLogin = $('tog-logo-login').checked;
+  await setDoc(doc(db,'settings','site'), SITE_SETTINGS, {merge:true});
+  applyLogoVisibility();
+  toast('Настройки логотипа сохранены ✓','ok');
+};
+
+// Открытие страницы настроек
+$('ngra').onclick=()=>{
+  renderGradeSettings();
+  fillSettingsForm();
+  show('screen-gr');
+};
 </script>
 </body>
 </html>

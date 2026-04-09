@@ -279,11 +279,15 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .swatch.active{border-color:var(--tx);}
 
 /* ── GROUP TABS ───────────────────────────────────────────── */
-.group-tabs{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;}
+.group-tabs{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center;}
 .gtab{background:var(--bg);border:1.5px solid var(--br);border-radius:20px;
   padding:.3rem .85rem;font-size:.8rem;font-weight:600;cursor:pointer;
-  transition:all .18s;color:var(--mu);}
-.gtab.active,.gtab:hover{background:var(--ac-lt);border-color:var(--ac);color:var(--ac);}
+  transition:all .18s;color:var(--mu);white-space:nowrap;}
+.gtab.active{background:var(--ac-lt);border-color:var(--ac);color:var(--ac);}
+.gtab:hover{background:var(--ac-lt);border-color:var(--ac);color:var(--ac);}
+/* Кнопка "Выбрать всех" — правее остальных */
+.gtab[style*="margin-left:auto"]{
+  background:transparent;border-color:var(--br);color:var(--mu);font-weight:500;font-size:.76rem;}
 
 /* ── SEARCH ───────────────────────────────────────────────── */
 .swrap{margin-bottom:1rem;position:relative;}
@@ -556,14 +560,18 @@ const auth = getAuth(app);
 const db   = getFirestore(app);
 
 // ── Logo from root ─────────────────────────────────────────────
-// Проверяем наличие logo.png через fetch, потом грузим — надёжнее Image probe
-function applyLogo(){
-  document.querySelectorAll('.logo-img').forEach(e=>{e.src='logo.png';e.style.display='block';});
+// Пробуем загрузить logo.PNG (регистронезависимо через два варианта)
+function applyLogo(src){
+  document.querySelectorAll('.logo-img').forEach(e=>{e.src=src;e.style.display='block';});
   document.querySelectorAll('.logo-text').forEach(e=>e.style.display='none');
 }
-fetch('logo.png',{method:'HEAD',cache:'no-cache'})
-  .then(r=>{if(r.ok)applyLogo();})
-  .catch(()=>{});
+(function tryLogo(names,i){
+  if(i>=names.length)return;
+  const img=new Image();
+  img.onload=()=>applyLogo(names[i]);
+  img.onerror=()=>tryLogo(names,i+1);
+  img.src=names[i]+'?t='+Date.now();
+})(['logo.png','logo.PNG','logo.jpg','logo.JPG'],0);
 
 // ── Nav scroll shadow ─────────────────────────────────────────
 window.addEventListener('scroll',()=>{
@@ -575,7 +583,17 @@ const $   = id=>document.getElementById(id);
 const esc = s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const fmt = ts=>{if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});};
 
-function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.add('hidden'));$(id)?.classList.remove('hidden');window.scrollTo(0,0);}
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>{
+    if(!s.classList.contains('hidden')){
+      // Убираем анимации у всех карточек скрываемого экрана
+      s.querySelectorAll('[style*="animation"]').forEach(el=>el.style.animation='none');
+    }
+    s.classList.add('hidden');
+  });
+  $(id)?.classList.remove('hidden');
+  window.scrollTo(0,0);
+}
 function mshow(id){$(id).classList.remove('hidden');}
 function mhide(id){$(id).classList.add('hidden');}
 function toast(msg,type=''){
@@ -794,19 +812,25 @@ function fillGroupSelect(){
   });
 }
 
-// ── Group tabs helper ──────────────────────────────────────────
+// ── Group tabs helper — множественный выбор групп ──────────────
+// checkedSet — Set uid-ов которые уже имеют доступ (чекбоксы будут checked)
+// filterFn(uid) — дополнительный фильтр (например enrolled в курс)
 function buildGroupTabs(containerId,listId,allStudents,checkedSet,filterFn){
-  const tabsEl=$(containerId);tabsEl.innerHTML='';
-  const tabs=[{id:'',name:'Все'},...GROUPS];
-  let activeGrp='';
+  const tabsEl=$(containerId); tabsEl.innerHTML='';
+  const listEl=$(listId);
+
+  // Активные группы — Set id-ов. Пусто = показываем всех
+  const activeGroups=new Set();
+
   function render(){
-    const listEl=$(listId);listEl.innerHTML='';
+    listEl.innerHTML='';
     let shown=0;
     allStudents.forEach(([uid,u])=>{
-      if(!filterFn(uid))return;
-      if(activeGrp&&u.groupId!==activeGrp)return;
+      if(!filterFn(uid)) return;
+      // Если выбраны конкретные группы — показываем только их студентов
+      if(activeGroups.size>0 && !activeGroups.has(u.groupId||'')) return;
       shown++;
-      const row=document.createElement('div');row.className='arow';
+      const row=document.createElement('div'); row.className='arow';
       const grp=u.groupName?` <span class="grptag">${esc(u.groupName)}</span>`:'';
       row.innerHTML=`<label class="albl">
         <input type="checkbox" data-uid="${uid}" ${checkedSet.has(uid)?'checked':''}/>
@@ -815,18 +839,52 @@ function buildGroupTabs(containerId,listId,allStudents,checkedSet,filterFn){
       </label>`;
       listEl.appendChild(row);
     });
-    if(!shown)listEl.innerHTML='<p class="empty" style="padding:1rem">Нет студентов в этой группе</p>';
+    if(!shown) listEl.innerHTML='<p class="empty" style="padding:1rem">Нет студентов</p>';
   }
-  tabs.forEach(g=>{
-    const t=document.createElement('button');t.className='gtab'+(g.id===activeGrp?' active':'');
-    t.textContent=g.name;
-    t.addEventListener('click',()=>{
-      activeGrp=g.id;
-      tabsEl.querySelectorAll('.gtab').forEach(x=>x.classList.toggle('active',x.textContent===g.name));
+
+  // Кнопка "Все"
+  const allBtn=document.createElement('button');
+  allBtn.className='gtab active'; allBtn.textContent='Все';
+  allBtn.addEventListener('click',()=>{
+    activeGroups.clear();
+    tabsEl.querySelectorAll('.gtab').forEach(x=>x.classList.remove('active'));
+    allBtn.classList.add('active');
+    render();
+  });
+  tabsEl.appendChild(allBtn);
+
+  // Кнопки групп — можно активировать несколько
+  GROUPS.forEach(g=>{
+    const btn=document.createElement('button');
+    btn.className='gtab'; btn.textContent=g.name;
+    btn.addEventListener('click',()=>{
+      if(activeGroups.has(g.id)){
+        activeGroups.delete(g.id);
+        btn.classList.remove('active');
+      } else {
+        activeGroups.add(g.id);
+        btn.classList.add('active');
+      }
+      // Если ни одна группа не выбрана — переключаемся на "Все"
+      if(activeGroups.size===0){
+        allBtn.classList.add('active');
+      } else {
+        allBtn.classList.remove('active');
+      }
       render();
     });
-    tabsEl.appendChild(t);
+    tabsEl.appendChild(btn);
   });
+
+  // Кнопка "Отметить всех видимых"
+  const selAllBtn=document.createElement('button');
+  selAllBtn.className='gtab'; selAllBtn.textContent='☑ Выбрать всех';
+  selAllBtn.style.marginLeft='auto';
+  selAllBtn.addEventListener('click',()=>{
+    listEl.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=true);
+  });
+  tabsEl.appendChild(selAllBtn);
+
   render();
 }
 

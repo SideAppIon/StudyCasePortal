@@ -41,19 +41,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-hei
 .anim-delay-4  {animation-delay:.28s}
 .anim-delay-5  {animation-delay:.35s}
 
-/* стаггер для списков */
-#list-ac .card:nth-child(1),#list-at .card:nth-child(1),
-#list-au .card:nth-child(1),#list-sc .card:nth-child(1),
-#list-st .card:nth-child(1){animation-delay:.04s}
-#list-ac .card:nth-child(2),#list-at .card:nth-child(2),
-#list-au .card:nth-child(2),#list-sc .card:nth-child(2),
-#list-st .card:nth-child(2){animation-delay:.09s}
-#list-ac .card:nth-child(3),#list-at .card:nth-child(3),
-#list-au .card:nth-child(3),#list-sc .card:nth-child(3),
-#list-st .card:nth-child(3){animation-delay:.14s}
-#list-ac .card:nth-child(n+4),#list-at .card:nth-child(n+4),
-#list-au .card:nth-child(n+4),#list-sc .card:nth-child(n+4),
-#list-st .card:nth-child(n+4){animation-delay:.19s}
+/* стаггер только через inline style в JS — не дублировать здесь */
 
 /* ── NAV ───────────────────────────────────────────────── */
 #app-nav{position:sticky;top:0;z-index:100;background:var(--sf);
@@ -135,8 +123,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .card{background:var(--sf);border:1px solid var(--br);border-radius:var(--rd);
   padding:.95rem 1.1rem;display:flex;align-items:center;gap:.9rem;
   margin-bottom:.6rem;box-shadow:var(--sh);
-  transition:box-shadow .2s,transform .2s,border-color .2s;
-  animation:fadeUp .3s ease both;}
+  transition:box-shadow .2s,transform .2s,border-color .2s;}
 .card.clk{cursor:pointer;}
 .card.clk:hover{box-shadow:var(--shm);transform:translateY(-2px);border-color:rgba(37,99,235,.2);}
 .card.locked{opacity:.52;background:#F8FAFC;}
@@ -303,7 +290,16 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .swrap input{padding-left:2.2rem;}
 .swrap::before{content:'🔍';position:absolute;left:.7rem;top:50%;transform:translateY(-50%);font-size:.85rem;pointer-events:none;}
 
-/* ── LOADING ──────────────────────────────────────────────── */
+/* ── GRADES JOURNAL SECTIONS ─────────────────────────────── */
+.gj-section-hdr{display:flex;align-items:center;gap:.5rem;
+  font-size:.82rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;
+  margin:1.4rem 0 .6rem;padding-bottom:.4rem;border-bottom:2px solid var(--br);}
+.gj-section-hdr:first-child{margin-top:0;}
+.gj-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.gj-dot-pend{background:#F59E0B;}
+.gj-dot-chk {background:#22C55E;}
+.gj-count{background:var(--bg);border:1px solid var(--br);border-radius:20px;
+  padding:0 6px;font-size:.72rem;color:var(--mu);margin-left:.2rem;}
 .spinner{display:inline-block;width:20px;height:20px;border:2.5px solid var(--br);
   border-top-color:var(--ac);border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-right:.4rem;}
 .skeleton{background:linear-gradient(90deg,var(--bg) 25%,var(--br) 50%,var(--bg) 75%);
@@ -560,14 +556,14 @@ const auth = getAuth(app);
 const db   = getFirestore(app);
 
 // ── Logo from root ─────────────────────────────────────────────
-(()=>{
-  const p=new Image();
-  p.onload=()=>{
-    document.querySelectorAll('.logo-img').forEach(e=>{e.src='logo.png';e.style.display='block';});
-    document.querySelectorAll('.logo-text').forEach(e=>e.style.display='none');
-  };
-  p.src='logo.png?'+Date.now();
-})();
+// Проверяем наличие logo.png через fetch, потом грузим — надёжнее Image probe
+function applyLogo(){
+  document.querySelectorAll('.logo-img').forEach(e=>{e.src='logo.png';e.style.display='block';});
+  document.querySelectorAll('.logo-text').forEach(e=>e.style.display='none');
+}
+fetch('logo.png',{method:'HEAD',cache:'no-cache'})
+  .then(r=>{if(r.ok)applyLogo();})
+  .catch(()=>{});
 
 // ── Nav scroll shadow ─────────────────────────────────────────
 window.addEventListener('scroll',()=>{
@@ -641,7 +637,15 @@ $('btnlogin').onclick=async()=>{
   catch{toast('Неверный email или пароль','err');$('btnlogin').textContent='Войти';}
 };
 $('lpass').onkeydown=e=>{if(e.key==='Enter')$('btnlogin').click();};
-$('nout').onclick=async()=>{await signOut(auth);$('app-nav').classList.add('hidden');CU=null;UP=null;show('screen-login');};
+$('nout').onclick=async()=>{
+  await signOut(auth);
+  $('app-nav').classList.add('hidden');
+  CU=null;UP=null;
+  // Сбрасываем кнопку входа и поля
+  $('btnlogin').textContent='Войти';
+  $('lemail').value='';$('lpass').value='';
+  show('screen-login');
+};
 
 // ═══════════════════════════════════════════════════════════════
 //  NAV
@@ -730,8 +734,9 @@ async function loadGroups(){
   await loadGroupsCache();
   const list=$('list-grp');list.innerHTML='';
   if(!GROUPS.length){list.innerHTML='<p class="empty">Групп нет. Создай первую!</p>';return;}
-  GROUPS.forEach(g=>{
-    const card=document.createElement('div');card.className='card anim-fade-up';
+  GROUPS.forEach((g,gi)=>{
+    const card=document.createElement('div');card.className='card';
+    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${gi*0.06}s`;
     card.innerHTML=`<div class="ci"><h3>${esc(g.name)}</h3><p>${esc(g.description||'')}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="editgrp" data-id="${g.id}" data-name="${esc(g.name)}" data-desc="${esc(g.description||'')}">✏ Изменить</button>
@@ -834,8 +839,8 @@ async function loadCourses(){
   if(snap.empty){list.innerHTML='<p class="empty">Курсов нет. Создай первый!</p>';return;}
   snap.forEach((d,i)=>{
     const c=d.data();
-    const card=document.createElement('div');card.className='card anim-fade-up';
-    card.style.animationDelay=i*0.06+'s';
+    const card=document.createElement('div');card.className='card';
+    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.06}s`;
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="topics" data-id="${d.id}" data-title="${esc(c.title)}">Темы</button>
@@ -901,8 +906,8 @@ async function loadTopics(){
   if(!topics.length){list.innerHTML='<p class="empty">Тем нет. Создай первую!</p>';return;}
   topics.forEach((t,i)=>{
     const bc=(t.blocks||[]).length;
-    const card=document.createElement('div');card.className='card anim-fade-up';
-    card.style.animationDelay=i*0.06+'s';
+    const card=document.createElement('div');card.className='card';
+    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.06}s`;
     card.innerHTML=`<div class="ci"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${bc}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="edittopic" data-id="${t.id}">✏ Редактировать</button>
@@ -1040,8 +1045,8 @@ async function loadUsers(){
       if(f&&!((u.name||'').toLowerCase().includes(f)||(u.email||'').toLowerCase().includes(f)))return;
       const rl=u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
       const grp=u.groupName?` <span class="grptag">${esc(u.groupName)}</span>`:'';
-      const card=document.createElement('div');card.className='card anim-fade-up';
-      card.style.animationDelay=i*0.04+'s';
+      const card=document.createElement('div');card.className='card';
+      card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.04}s`;
       card.innerHTML=`<div class="ci"><h3>${esc(u.name||'—')}</h3>
         <p>${esc(u.email)} · <span class="rbadge r${u.role[0]}">${rl}</span>${grp}</p></div>
         <div class="ca">
@@ -1145,8 +1150,8 @@ async function loadAnswers(){
     const sl=a.status==='checked'?'✅ Проверено':'⏳ На проверке';
     const savedGrade=GRADES.find(g=>g.id===a.gradeId);
     const gh=savedGrade?gradeChip(savedGrade):'';
-    const card=document.createElement('div');card.className='card acard anim-fade-up';
-    card.style.animationDelay=i*0.04+'s';
+    const card=document.createElement('div');card.className='card acard';
+    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.04}s`;
 
     // Build grade options
     const gradeOpts=GRADES.map(g=>`<option value="${g.id}" ${a.gradeId===g.id?'selected':''}>${esc(g.label)}</option>`).join('');
@@ -1193,41 +1198,100 @@ $('asearch').addEventListener('input',function(){
   document.querySelectorAll('.acard').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
 });
 
-// ── Grades journal ──────────────────────────────────────────────
+// ── Grades journal — разделён на проверенные / непроверенные ────
 async function loadGrades(){
   const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
-  const list=$('list-gj');list.innerHTML='';const by={};
-  snap.forEach(d=>{const a=d.data();if(!a.gradeId)return;const n=a.studentName||a.studentEmail;(by[n]=by[n]||[]).push(a);});
-  if(!Object.keys(by).length){list.innerHTML='<p class="empty">Оценок нет</p>';return;}
-  Object.entries(by).forEach(([name,entries],si)=>{
-    const sec=document.createElement('div');sec.className='gsec';sec.style.animationDelay=si*0.07+'s';
-    sec.innerHTML=`<h3 class="gname">${esc(name)}</h3>`;
-    entries.forEach(a=>{
-      const g=GRADES.find(x=>x.id===a.gradeId);
-      const row=document.createElement('div');row.className='grow';
-      row.innerHTML=`<span class="gtopic">${esc(a.topicTitle||'—')}</span>
-        <span class="muted">${fmt(a.checkedAt)}</span>
-        ${g?gradeChip(g):''}`;
-      sec.appendChild(row);
-    });
-    list.appendChild(sec);
+  const list=$('list-gj');list.innerHTML='';
+  const checked=[], pending=[];
+  snap.forEach(d=>{
+    const a=d.data();
+    if(a.status==='checked') checked.push(a);
+    else pending.push(a);
   });
+  if(!checked.length&&!pending.length){list.innerHTML='<p class="empty">Ответов нет</p>';return;}
+
+  // ── Секция: Непроверенные ──
+  if(pending.length){
+    const hdr=document.createElement('div');hdr.className='gj-section-hdr';
+    hdr.innerHTML=`<span class="gj-dot gj-dot-pend"></span>На проверке <span class="gj-count">${pending.length}</span>`;
+    list.appendChild(hdr);
+    const byStudent={};
+    pending.forEach(a=>{const n=a.studentName||a.studentEmail;(byStudent[n]=byStudent[n]||[]).push(a);});
+    Object.entries(byStudent).forEach(([name,entries],si)=>{
+      const sec=document.createElement('div');sec.className='gsec';
+      sec.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${si*0.05}s`;
+      sec.innerHTML=`<h3 class="gname">${esc(name)}</h3>`;
+      entries.forEach(a=>{
+        const row=document.createElement('div');row.className='grow';
+        row.innerHTML=`<span class="gtopic">${esc(a.topicTitle||'—')}</span>
+          <span class="muted">${fmt(a.createdAt)}</span>
+          <span class="sbadge spend" style="margin-left:.5rem">⏳ Ожидает</span>`;
+        sec.appendChild(row);
+      });
+      list.appendChild(sec);
+    });
+  }
+
+  // ── Секция: Проверенные ──
+  if(checked.length){
+    const hdr=document.createElement('div');hdr.className='gj-section-hdr';
+    hdr.innerHTML=`<span class="gj-dot gj-dot-chk"></span>Проверено <span class="gj-count">${checked.length}</span>`;
+    list.appendChild(hdr);
+    const byStudent={};
+    checked.forEach(a=>{const n=a.studentName||a.studentEmail;(byStudent[n]=byStudent[n]||[]).push(a);});
+    Object.entries(byStudent).forEach(([name,entries],si)=>{
+      const sec=document.createElement('div');sec.className='gsec';
+      sec.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${si*0.05}s`;
+      sec.innerHTML=`<h3 class="gname">${esc(name)}</h3>`;
+      entries.forEach(a=>{
+        const g=GRADES.find(x=>x.id===a.gradeId);
+        const row=document.createElement('div');row.className='grow';
+        row.innerHTML=`<span class="gtopic">${esc(a.topicTitle||'—')}</span>
+          <span class="muted">${fmt(a.checkedAt)}</span>
+          ${g?gradeChip(g):'<span class="muted">—</span>'}`;
+        sec.appendChild(row);
+      });
+      list.appendChild(sec);
+    });
+  }
 }
 
 async function loadMyGrades(){
   const snap=await getDocs(query(collection(db,'answers'),where('studentId','==',CU.uid),orderBy('createdAt','desc')));
-  const list=$('list-mg');list.innerHTML='';let any=false;
-  snap.forEach((d,i)=>{
-    const a=d.data();if(!a.gradeId)return;any=true;
-    const g=GRADES.find(x=>x.id===a.gradeId);
-    const card=document.createElement('div');card.className='card anim-fade-up';card.style.animationDelay=i*0.05+'s';
-    card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
-      <p class="muted">${fmt(a.checkedAt)}</p>
-      ${a.feedback?`<p class="gfb">💬 ${esc(a.feedback)}</p>`:''}</div>
-      ${g?gradeChip(g,true):''}`;
-    list.appendChild(card);
-  });
-  if(!any)list.innerHTML='<p class="empty">Оценок нет</p>';
+  const list=$('list-mg');list.innerHTML='';
+  const checked=[],pending=[];
+  snap.forEach(d=>{const a=d.data();if(a.status==='checked')checked.push(a);else pending.push(a);});
+  if(!checked.length&&!pending.length){list.innerHTML='<p class="empty">Ответов нет</p>';return;}
+
+  if(pending.length){
+    const hdr=document.createElement('div');hdr.className='gj-section-hdr';
+    hdr.innerHTML=`<span class="gj-dot gj-dot-pend"></span>Ожидают проверки <span class="gj-count">${pending.length}</span>`;
+    list.appendChild(hdr);
+    pending.forEach((a,i)=>{
+      const card=document.createElement('div');card.className='card';
+      card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.05}s`;
+      card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
+        <p class="muted">${fmt(a.createdAt)}</p></div>
+        <span class="sbadge spend">⏳ На проверке</span>`;
+      list.appendChild(card);
+    });
+  }
+
+  if(checked.length){
+    const hdr=document.createElement('div');hdr.className='gj-section-hdr';
+    hdr.innerHTML=`<span class="gj-dot gj-dot-chk"></span>Проверено <span class="gj-count">${checked.length}</span>`;
+    list.appendChild(hdr);
+    checked.forEach((a,i)=>{
+      const g=GRADES.find(x=>x.id===a.gradeId);
+      const card=document.createElement('div');card.className='card';
+      card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.05}s`;
+      card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
+        <p class="muted">${fmt(a.checkedAt)}</p>
+        ${a.feedback?`<p class="gfb">💬 ${esc(a.feedback)}</p>`:''}</div>
+        ${g?gradeChip(g,true):''}`;
+      list.appendChild(card);
+    });
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1244,7 +1308,8 @@ async function loadMyCourses(){
   list.innerHTML='';
   if(!visible.length){list.innerHTML='<p class="empty">Тебе пока не открыт доступ ни к одному курсу</p>';return;}
   visible.forEach((c,i)=>{
-    const card=document.createElement('div');card.className='card clk anim-fade-up';card.style.animationDelay=i*0.07+'s';
+    const card=document.createElement('div');card.className='card clk';
+    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${i*0.07}s`;
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div><div class="carrow">→</div>`;
     card.addEventListener('click',()=>openCourse(c.id,c.title));
     list.appendChild(card);
@@ -1259,11 +1324,13 @@ async function loadMyTopics(courseId){
   const list=$('list-st');list.innerHTML='';
   const topics=[];snap.forEach(d=>topics.push({id:d.id,...d.data()}));
   topics.sort((a,b)=>(a.order||0)-(b.order||0));
-  for(const t of topics){
+  for(let ti=0;ti<topics.length;ti++){
+    const t=topics[ti];
     const aSnap=await getDoc(doc(db,'courses',courseId,'topics',t.id,'access',CU.uid));
     const ok=aSnap.exists();
     const qc=(t.blocks||[]).filter(b=>b.type==='question').length;
-    const card=document.createElement('div');card.className=`card ${ok?'clk':'locked'} anim-fade-up`;
+    const card=document.createElement('div');card.className=`card ${ok?'clk':'locked'}`;
+    card.style.cssText=`animation:fadeUp .32s ease both;animation-delay:${ti*0.06}s`;
     card.innerHTML=`<div class="licon">${ok?'📖':'🔒'}</div>
       <div class="ci"><h3>${esc(t.title)}</h3>
       <p>${ok?(qc?`${qc} вопрос(а)`:'Материал для изучения'):'Заблокировано'}</p></div>`;

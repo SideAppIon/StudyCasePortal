@@ -480,27 +480,67 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.82em;
 
   <!-- Правила Firebase -->
   <div class="settings-block" style="margin-top:1.5rem;background:#FFFBEB;border-color:#FDE68A">
-    <h2 class="settings-h2">⚠️ Добавь в Firestore Rules</h2>
-    <p class="muted" style="margin-bottom:.75rem;font-size:.82rem">Для сохранения настроек нужно добавить в правила Firebase → Firestore → Rules:</p>
-    <pre style="background:var(--bg);padding:.9rem;border-radius:8px;font-size:.75rem;overflow-x:auto;border:1px solid var(--br)">match /settings/{doc} {
-  allow read: if request.auth != null;
-  allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-}
+    <h2 class="settings-h2">⚠️ Полные правила Firestore (замени целиком)</h2>
+    <p class="muted" style="margin-bottom:.75rem;font-size:.82rem">Открой Firebase → Firestore → Rules и замени содержимое полностью на это:</p>
+    <pre style="background:var(--bg);padding:.9rem;border-radius:8px;font-size:.75rem;overflow-x:auto;border:1px solid var(--br)">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isLoggedIn() { return request.auth != null; }
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+    function userExists() { return isLoggedIn() &amp;&amp; exists(userDocPath()); }
+    function getUser() { return get(userDocPath()); }
+    function isAdmin()   { return userExists() &amp;&amp; getUser().data.role == 'admin'; }
+    function isTeacher() { return userExists() &amp;&amp; getUser().data.role == 'teacher'; }
+    function isStudent() { return userExists() &amp;&amp; getUser().data.role == 'student'; }
 
-match /grades/{doc} {
-  allow read: if request.auth != null;
-  allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-}
-
-match /groups/{doc} {
-  allow read: if request.auth != null;
-  allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-}
-
-match /comments/{doc} {
-  allow read: if request.auth != null;
-  allow create: if request.auth != null;
-  allow update, delete: if request.auth.uid == resource.data.authorId;
+    match /users/{userId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    match /groups/{groupId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    match /grades/{gradeId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    match /settings/{docId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    match /courses/{courseId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+      match /enrollments/{userId} {
+        allow read: if isLoggedIn();
+        allow write: if isAdmin();
+      }
+      match /topics/{topicId} {
+        allow read: if isLoggedIn();
+        allow write: if isAdmin();
+        match /access/{userId} {
+          allow read: if isLoggedIn();
+          allow write: if isAdmin();
+        }
+      }
+    }
+    match /answers/{answerId} {
+      allow read: if isAdmin() || isTeacher()
+        || (isLoggedIn() &amp;&amp; request.auth.uid == resource.data.studentId);
+      allow create: if isLoggedIn();
+      allow update: if isAdmin() || isTeacher();
+      allow delete: if isAdmin();
+    }
+    match /comments/{commentId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn();
+      allow update, delete: if isLoggedIn()
+        &amp;&amp; request.auth.uid == resource.data.authorId;
+    }
+  }
 }</pre>
   </div>
 </div>
@@ -688,7 +728,9 @@ const fmt = ts=>{if(!ts)return'—';const d=ts.toDate?ts.toDate():new Date(ts);r
 // Web Animations API: каждый вызов .animate() — новый объект анимации,
 // не зависит от предыдущих вызовов и не может "повториться" от браузера
 function animOnce(el, keyframes, opts){
-  // Отменяем все текущие анимации на элементе, чтобы не накапливались
+  if(!el)return;
+  // Защита от NaN в delay — браузер выбрасывает TypeError
+  if(opts && !isFinite(opts.delay)) opts={...opts, delay:0};
   el.getAnimations().forEach(a=>a.cancel());
   el.animate(keyframes, opts);
 }
@@ -698,7 +740,7 @@ function animCard(parent, el, delay=0){
   parent.appendChild(el);
   animOnce(el,
     [{opacity:'0', transform:'translateY(14px)'},{opacity:'1', transform:'none'}],
-    {duration:280, delay:delay*1000, easing:'ease', fill:'both'}
+    {duration:280, delay:(isFinite(delay)?delay:0)*1000, easing:'ease', fill:'both'}
   );
 }
 
@@ -1049,7 +1091,8 @@ async function loadCourses(){
   const snap=await getDocs(collection(db,'courses'));
   const list=$('list-ac');list.innerHTML='';
   if(snap.empty){list.innerHTML='<p class="empty">Курсов нет. Создай первый!</p>';return;}
-  snap.forEach((d,i)=>{
+  const docs=[...snap.docs];
+  docs.forEach((d,i)=>{
     const c=d.data();
     const card=document.createElement('div');card.className='card';
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
@@ -1358,7 +1401,8 @@ async function loadAnswers(){
   const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
   const list=$('list-ta');list.innerHTML='';
   if(snap.empty){list.innerHTML='<p class="empty">Ответов нет</p>';return;}
-  snap.forEach((d,i)=>{
+  const docs=[...snap.docs];
+  docs.forEach((d,i)=>{
     const a=d.data();
     const sc=a.status==='checked'?'schk':'spend';
     const sl=a.status==='checked'?'✅ Проверено':'⏳ На проверке';

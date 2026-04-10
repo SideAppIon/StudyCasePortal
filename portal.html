@@ -478,71 +478,6 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.82em;
     <button class="btn bp btn-sm" id="btn-save-footer">Сохранить</button>
   </div>
 
-  <!-- Правила Firebase -->
-  <div class="settings-block" style="margin-top:1.5rem;background:#FFFBEB;border-color:#FDE68A">
-    <h2 class="settings-h2">⚠️ Полные правила Firestore (замени целиком)</h2>
-    <p class="muted" style="margin-bottom:.75rem;font-size:.82rem">Открой Firebase → Firestore → Rules и замени содержимое полностью на это:</p>
-    <pre style="background:var(--bg);padding:.9rem;border-radius:8px;font-size:.75rem;overflow-x:auto;border:1px solid var(--br)">rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    function isLoggedIn() { return request.auth != null; }
-    function userDocPath() {
-      return /databases/$(database)/documents/users/$(request.auth.uid);
-    }
-    function userExists() { return isLoggedIn() &amp;&amp; exists(userDocPath()); }
-    function getUser() { return get(userDocPath()); }
-    function isAdmin()   { return userExists() &amp;&amp; getUser().data.role == 'admin'; }
-    function isTeacher() { return userExists() &amp;&amp; getUser().data.role == 'teacher'; }
-    function isStudent() { return userExists() &amp;&amp; getUser().data.role == 'student'; }
-
-    match /users/{userId} {
-      allow read: if isLoggedIn();
-      allow write: if isAdmin();
-    }
-    match /groups/{groupId} {
-      allow read: if isLoggedIn();
-      allow write: if isAdmin();
-    }
-    match /grades/{gradeId} {
-      allow read: if isLoggedIn();
-      allow write: if isAdmin();
-    }
-    match /settings/{docId} {
-      allow read: if isLoggedIn();
-      allow write: if isAdmin();
-    }
-    match /courses/{courseId} {
-      allow read: if isLoggedIn();
-      allow write: if isAdmin();
-      match /enrollments/{userId} {
-        allow read: if isLoggedIn();
-        allow write: if isAdmin();
-      }
-      match /topics/{topicId} {
-        allow read: if isLoggedIn();
-        allow write: if isAdmin();
-        match /access/{userId} {
-          allow read: if isLoggedIn();
-          allow write: if isAdmin();
-        }
-      }
-    }
-    match /answers/{answerId} {
-      allow read: if isAdmin() || isTeacher()
-        || (isLoggedIn() &amp;&amp; request.auth.uid == resource.data.studentId);
-      allow create: if isLoggedIn();
-      allow update: if isAdmin() || isTeacher();
-      allow delete: if isAdmin();
-    }
-    match /comments/{commentId} {
-      allow read: if isLoggedIn();
-      allow create: if isLoggedIn();
-      allow update, delete: if isLoggedIn()
-        &amp;&amp; request.auth.uid == resource.data.authorId;
-    }
-  }
-}</pre>
-  </div>
 </div>
 
 
@@ -1463,6 +1398,92 @@ $('list-ta').addEventListener('click',async e=>{
   btn.textContent='✓'; setTimeout(()=>{btn.textContent='Сохранить';},1500);
   loadAnswers();
 });
+
+// Chat toggle functionality
+$('list-ta').addEventListener('click',async e=>{
+  const btn=e.target.closest('button.answer-chat-toggle');if(!btn)return;
+  const {tid,cid,chatid}=btn.dataset;
+  const chatWrap=document.getElementById(`chat-${chatid}`);
+  
+  if(chatWrap.style.display==='none'){
+    chatWrap.style.display='block';
+    btn.textContent='💬 Скрыть обсуждение';
+    await loadAnswerChat(chatWrap, tid, cid, chatid);
+  }else{
+    chatWrap.style.display='none';
+    btn.textContent='💬 Открыть обсуждение со студентом';
+  }
+});
+
+async function loadAnswerChat(container, topicId, courseId, answerId){
+  container.innerHTML='<div style="padding:1rem;text-align:center">Загрузка...</div>';
+  
+  try{
+    const snap=await getDocs(query(
+      collection(db,'comments'),
+      where('topicId','==',topicId),
+      where('courseId','==',courseId),
+      where('answerId','==',answerId)
+    ));
+    
+    const list=document.createElement('div');list.className='comments-list';
+    const commentDocs=[...snap.docs].sort((a,b)=>{
+      const ta=a.data().createdAt?.toMillis?.()??0;
+      const tb=b.data().createdAt?.toMillis?.()??0;
+      return ta-tb;
+    });
+    
+    if(!commentDocs.length){
+      list.innerHTML='<p class="empty" style="padding:.75rem 0">Нет сообщений</p>';
+    }else{
+      commentDocs.forEach(d=>{
+        const c=d.data();
+        const isMe = c.authorId===CU.uid;
+        const bubble=document.createElement('div');
+        bubble.className='comment-bubble '+(isMe?'comment-me':'comment-other');
+        bubble.innerHTML=`
+          <div class="comment-author">${esc(c.authorName||c.authorEmail)}${isMe?' (Вы)':''}</div>
+          <div class="comment-text">${esc(c.text).replace(/\n/g,'<br/>')}</div>
+          <div class="comment-time">${fmt(c.createdAt)}</div>`;
+        list.appendChild(bubble);
+      });
+    }
+    
+    container.innerHTML='';
+    container.appendChild(list);
+    
+    // Add form for new message
+    const form=document.createElement('div');form.className='comment-form';
+    form.innerHTML=`<textarea class="comment-ta" placeholder="Написать сообщение..."></textarea>
+      <button class="btn bp btn-sm comment-send">Отправить</button>`;
+    
+    form.querySelector('.comment-send').addEventListener('click',async()=>{
+      const ta=form.querySelector('textarea');
+      const text=ta.value.trim();
+      if(!text){toast('Введи текст сообщения','err');return;}
+      const sendBtn=form.querySelector('.comment-send');
+      sendBtn.disabled=true;sendBtn.textContent='...';
+      try{
+        await addDoc(collection(db,'comments'),{
+          topicId, courseId, answerId,
+          authorId:CU.uid, authorEmail:CU.email,
+          authorName:UP.name||CU.email,
+          role:UP.role, text,
+          createdAt:serverTimestamp()
+        });
+        ta.value='';
+        toast('Сообщение отправлено ✓','ok');
+        await loadAnswerChat(container, topicId, courseId, answerId);
+      }catch(e){toast('Ошибка: '+e.message,'err');}
+      finally{sendBtn.disabled=false;sendBtn.textContent='Отправить';}
+    });
+    
+    container.appendChild(form);
+    
+  }catch(e){
+    container.innerHTML='<p class="empty" style="color:var(--red)">Ошибка загрузки чата</p>';
+  }
+}
 $('asearch').addEventListener('input',function(){
   const q=this.value.toLowerCase();
   document.querySelectorAll('.acard').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
@@ -1673,12 +1694,16 @@ async function openTopicView(topic){
       st.appendChild(fbDiv);
       // Раздел ответов студента
       st.appendChild(await buildStudentAnswersSection(topic.id));
+      // Раздел обсуждения с преподавателем
+      st.appendChild(await buildCommentsSection(topic.id));
     } else if(prev?.status==='pending'){
       const w=document.createElement('div');w.className='fbwait';
       w.textContent='⏳ Ответ отправлен на проверку';
       st.appendChild(w);
       // Студент может отправить дополнительные ответы
       st.appendChild(await buildStudentAnswersSection(topic.id));
+      // Раздел обсуждения с преподавателем
+      st.appendChild(await buildCommentsSection(topic.id));
     } else {
       const btn=document.createElement('button');btn.className='btn bsubmit';
       btn.textContent='Отправить ответы на проверку';
@@ -1762,6 +1787,85 @@ async function buildStudentAnswersSection(topicId){
       wrap.replaceWith(newSection);
     }catch(e){toast('Ошибка: '+e.message,'err');}
     finally{sendBtn.disabled=false;sendBtn.textContent='Отправить ответ';}
+  });
+  wrap.appendChild(form);
+  return wrap;
+}
+
+// ── Система комментариев к теме ───────────────────────────────────
+async function buildCommentsSection(topicId){
+  const wrap=document.createElement('div');wrap.className='comments-wrap';
+  wrap.innerHTML='<h3 class="comments-title">💬 Обсуждение с преподавателем</h3>';
+
+  // Загружаем комментарии — без orderBy чтобы не требовался составной индекс
+  const snap=await getDocs(query(
+    collection(db,'comments'),
+    where('topicId','==',topicId),
+    where('courseId','==',CID)
+  ));
+
+  const list=document.createElement('div');list.className='comments-list';
+  // Сортировка на клиенте по времени создания
+  const commentDocs=[...snap.docs].sort((a,b)=>{
+    const ta=a.data().createdAt?.toMillis?.()??0;
+    const tb=b.data().createdAt?.toMillis?.()??0;
+    return ta-tb;
+  });
+  if(!commentDocs.length){
+    list.innerHTML='<p class="empty" style="padding:.75rem 0">Комментариев нет — будь первым!</p>';
+  } else {
+    commentDocs.forEach(d=>{
+      const c=d.data();
+      const isMe = c.authorId===CU.uid;
+      const bubble=document.createElement('div');
+      bubble.className='comment-bubble '+(isMe?'comment-me':'comment-other');
+      bubble.innerHTML=`
+        <div class="comment-author">${esc(c.authorName||c.authorEmail)}${isMe?' (Вы)':''}</div>
+        <div class="comment-text">${esc(c.text).replace(/\n/g,'<br/>')}</div>
+        <div class="comment-time">${fmt(c.createdAt)}</div>`;
+      list.appendChild(bubble);
+    });
+  }
+  wrap.appendChild(list);
+
+  // Форма отправки нового комментария
+  const form=document.createElement('div');form.className='comment-form';
+  form.innerHTML=`<textarea class="comment-ta" placeholder="Написать комментарий..."></textarea>
+    <button class="btn bp btn-sm comment-send">Отправить</button>`;
+  form.querySelector('.comment-send').addEventListener('click',async()=>{
+    const ta=form.querySelector('textarea');
+    const text=ta.value.trim();
+    if(!text){toast('Введи текст комментария','err');return;}
+    const sendBtn=form.querySelector('.comment-send');
+    sendBtn.disabled=true;sendBtn.textContent='...';
+    try{
+      const ref=await addDoc(collection(db,'comments'),{
+        topicId, courseId:CID,
+        authorId:CU.uid, authorEmail:CU.email,
+        authorName:UP.name||CU.email,
+        role:UP.role, text,
+        createdAt:serverTimestamp()
+      });
+      ta.value='';
+      toast('Комментарий отправлен','ok');
+      // Добавляем пузырёк прямо в список без перезагрузки всего раздела
+      // Убираем заглушку "комментариев нет" если есть
+      const emptyEl=list.querySelector('.empty');if(emptyEl)emptyEl.remove();
+      const bubble=document.createElement('div');
+      bubble.className='comment-bubble comment-me';
+      const now=new Date();
+      const fmtNow=now.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+      bubble.innerHTML=`
+        <div class="comment-author">${esc(UP.name||CU.email)} (Вы)</div>
+        <div class="comment-text">${esc(text).replace(/\n/g,'<br/>')}</div>
+        <div class="comment-time">${fmtNow}</div>`;
+      list.appendChild(bubble);
+      animOnce(bubble,
+        [{opacity:'0',transform:'translateY(8px)'},{opacity:'1',transform:'none'}],
+        {duration:220,easing:'ease',fill:'both'}
+      );
+    }catch(e){toast('Ошибка: '+e.message,'err');}
+    finally{sendBtn.disabled=false;sendBtn.textContent='Отправить';}
   });
   wrap.appendChild(form);
   return wrap;

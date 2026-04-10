@@ -1375,14 +1375,9 @@ async function loadAnswers(){
             ${gradeOpts}
           </select>
         </div>
-        <div class="fbr"><label class="slbl">Комментарий преподавателя</label>
-          <textarea class="fbinp" id="fb${d.id}" placeholder="Комментарий...">${esc(a.feedback||'')}</textarea>
-        </div>
         <button class="btn bp fbbtn" data-aid="${d.id}">Сохранить</button>
       </div>
-      <div class="answer-chat-wrap" id="chat-${d.id}"></div>
-      <button class="btn bs btn-sm answer-chat-toggle" data-tid="${a.topicId}" data-cid="${a.courseId}" data-chatid="${d.id}" data-answerid="${a.answerId}"
-        style="margin-top:.5rem;font-size:.76rem">💬 Открыть обсуждение со студентом</button>`;
+`;
     animCard(list, card, i*0.04);
   });
 }
@@ -1399,117 +1394,13 @@ $('list-ta').addEventListener('click',async e=>{
   loadAnswers();
 });
 
-// Chat toggle functionality
-$('list-ta').addEventListener('click',async e=>{
-  const btn=e.target.closest('button.answer-chat-toggle');if(!btn)return;
-  const {tid,cid,chatid}=btn.dataset;
-  const chatWrap=document.getElementById(`chat-${chatid}`);
-  
-  if(chatWrap.style.display==='none'){
-    chatWrap.style.display='block';
-    btn.textContent='💬 Скрыть обсуждение';
-    await loadAnswerChat(chatWrap, tid, cid, chatid);
-  }else{
-    chatWrap.style.display='none';
-    btn.textContent='💬 Открыть обсуждение со студентом';
-  }
-});
 
-async function loadAnswerChat(container, topicId, courseId, answerId){
-  container.innerHTML='<div style="padding:1rem;text-align:center">Загрузка...</div>';
-  
-  try{
-    const snap=await getDocs(query(
-      collection(db,'comments'),
-      where('topicId','==',topicId),
-      where('courseId','==',courseId),
-      where('answerId','==',answerId)
-    ));
-    
-    const list=document.createElement('div');list.className='comments-list';
-    const commentDocs=[...snap.docs].sort((a,b)=>{
-      const ta=a.data().createdAt?.toMillis?.()??0;
-      const tb=b.data().createdAt?.toMillis?.()??0;
-      return ta-tb;
-    });
-    
-    if(!commentDocs.length){
-      list.innerHTML='<p class="empty" style="padding:.75rem 0">Нет сообщений</p>';
-    }else{
-      commentDocs.forEach(d=>{
-        const c=d.data();
-        const isMe = c.authorId===CU.uid;
-        const bubble=document.createElement('div');
-        bubble.className='comment-bubble '+(isMe?'comment-me':'comment-other');
-        bubble.innerHTML=`
-          <div class="comment-author">${esc(c.authorName||c.authorEmail)}${isMe?' (Вы)':''}</div>
-          <div class="comment-text">${esc(c.text).replace(/\n/g,'<br/>')}</div>
-          <div class="comment-time">${fmt(c.createdAt)}</div>`;
-        list.appendChild(bubble);
-      });
-    }
-    
-    container.innerHTML='';
-    container.appendChild(list);
-    
-    // Add form for new message
-    const form=document.createElement('div');form.className='comment-form';
-    form.innerHTML=`<textarea class="comment-ta" placeholder="Написать сообщение..."></textarea>
-      <button class="btn bp btn-sm comment-send">Отправить</button>`;
-    
-    form.querySelector('.comment-send').addEventListener('click',async()=>{
-      const ta=form.querySelector('textarea');
-      const text=ta.value.trim();
-      if(!text){toast('Введи текст сообщения','err');return;}
-      const sendBtn=form.querySelector('.comment-send');
-      sendBtn.disabled=true;sendBtn.textContent='...';
-      try{
-        await addDoc(collection(db,'comments'),{
-          topicId, courseId, answerId,
-          authorId:CU.uid, authorEmail:CU.email,
-          authorName:UP.name||CU.email,
-          role:UP.role, text,
-          createdAt:serverTimestamp()
-        });
-        ta.value='';
-        toast('Сообщение отправлено ✓','ok');
-        await loadAnswerChat(container, topicId, courseId, answerId);
-      }catch(e){toast('Ошибка: '+e.message,'err');}
-      finally{sendBtn.disabled=false;sendBtn.textContent='Отправить';}
-    });
-    
-    container.appendChild(form);
-    
-  }catch(e){
-    container.innerHTML='<p class="empty" style="color:var(--red)">Ошибка загрузки чата</p>';
-  }
-}
 
 $('asearch').addEventListener('input',function(){
   const q=this.value.toLowerCase();
   document.querySelectorAll('.acard').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
 });
 
-// Открыть/закрыть обсуждение в карточке ответа (учитель)
-$('list-ta').addEventListener('click',async e=>{
-  const tog=e.target.closest('.answer-chat-toggle');if(!tog)return;
-  const {tid,cid,chatid}=tog.dataset;
-  const wrap=$('chat-'+chatid);
-  if(wrap.dataset.loaded){
-    // Скрыть/показать
-    wrap.style.display = wrap.style.display==='none' ? '' : 'none';
-    tog.textContent = wrap.style.display==='none' ? '💬 Открыть обсуждение со студентом' : '💬 Скрыть обсуждение';
-    return;
-  }
-  // Первый раз — загружаем
-  const prevCID = CID;
-  CID = cid; // временно ставим courseId чтобы buildCommentsSection мог его использовать
-  const section = await buildCommentsSection(tid, chatid);
-  CID = prevCID;
-  wrap.appendChild(section);
-  wrap.dataset.loaded='1';
-  tog.textContent='💬 Скрыть обсуждение';
-});
 
 // ── Grades journal — разделён на проверенные / непроверенные ────
 async function loadGrades(){
@@ -1695,16 +1586,12 @@ async function openTopicView(topic){
       st.appendChild(fbDiv);
       // Раздел ответов студента
       st.appendChild(await buildStudentAnswersSection(topic.id));
-      // Раздел обсуждения с преподавателем
-      st.appendChild(await buildCommentsSection(topic.id));
     } else if(prev?.status==='pending'){
       const w=document.createElement('div');w.className='fbwait';
       w.textContent='⏳ Ответ отправлен на проверку';
       st.appendChild(w);
       // Студент может отправить дополнительные ответы
       st.appendChild(await buildStudentAnswersSection(topic.id));
-      // Раздел обсуждения с преподавателем
-      st.appendChild(await buildCommentsSection(topic.id));
     } else {
       const btn=document.createElement('button');btn.className='btn bsubmit';
       btn.textContent='Отправить ответы на проверку';
@@ -1793,84 +1680,6 @@ async function buildStudentAnswersSection(topicId){
   return wrap;
 }
 
-// ── Система комментариев к теме ───────────────────────────────────
-async function buildCommentsSection(topicId, answerId = null){
-  const wrap=document.createElement('div');wrap.className='comments-wrap';
-  wrap.innerHTML='<h3 class="comments-title">💬 Обсуждение с преподавателем</h3>';
-
-  // Загружаем комментарии — без orderBy чтобы не требовался составной индекс
-  const snap=await getDocs(query(
-    collection(db,'comments'),
-    where('topicId','==',topicId),
-    where('courseId','==',CID)
-  ));
-
-  const list=document.createElement('div');list.className='comments-list';
-  // Сортировка на клиенте по времени создания
-  const commentDocs=[...snap.docs].sort((a,b)=>{
-    const ta=a.data().createdAt?.toMillis?.()??0;
-    const tb=b.data().createdAt?.toMillis?.()??0;
-    return ta-tb;
-  });
-  if(!commentDocs.length){
-    list.innerHTML='<p class="empty" style="padding:.75rem 0">Комментариев нет — будь первым!</p>';
-  } else {
-    commentDocs.forEach(d=>{
-      const c=d.data();
-      const isMe = c.authorId===CU.uid;
-      const bubble=document.createElement('div');
-      bubble.className='comment-bubble '+(isMe?'comment-me':'comment-other');
-      bubble.innerHTML=`
-        <div class="comment-author">${esc(c.authorName||c.authorEmail)}${isMe?' (Вы)':''}</div>
-        <div class="comment-text">${esc(c.text).replace(/\n/g,'<br/>')}</div>
-        <div class="comment-time">${fmt(c.createdAt)}</div>`;
-      list.appendChild(bubble);
-    });
-  }
-  wrap.appendChild(list);
-
-  // Форма отправки нового комментария
-  const form=document.createElement('div');form.className='comment-form';
-  form.innerHTML=`<textarea class="comment-ta" placeholder="Написать комментарий..."></textarea>
-    <button class="btn bp btn-sm comment-send">Отправить</button>`;
-  form.querySelector('.comment-send').addEventListener('click',async()=>{
-    const ta=form.querySelector('textarea');
-    const text=ta.value.trim();
-    if(!text){toast('Введи текст комментария','err');return;}
-    const sendBtn=form.querySelector('.comment-send');
-    sendBtn.disabled=true;sendBtn.textContent='...';
-    try{
-      const ref=await addDoc(collection(db,'comments'),{
-        topicId, courseId:CID,
-        authorId:CU.uid, authorEmail:CU.email,
-        authorName:UP.name||CU.email,
-        role:UP.role, text,
-        createdAt:serverTimestamp()
-      });
-      ta.value='';
-      toast('Комментарий отправлен','ok');
-      // Добавляем пузырёк прямо в список без перезагрузки всего раздела
-      // Убираем заглушку "комментариев нет" если есть
-      const emptyEl=list.querySelector('.empty');if(emptyEl)emptyEl.remove();
-      const bubble=document.createElement('div');
-      bubble.className='comment-bubble comment-me';
-      const now=new Date();
-      const fmtNow=now.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
-      bubble.innerHTML=`
-        <div class="comment-author">${esc(UP.name||CU.email)} (Вы)</div>
-        <div class="comment-text">${esc(text).replace(/\n/g,'<br/>')}</div>
-        <div class="comment-time">${fmtNow}</div>`;
-      list.appendChild(bubble);
-      animOnce(bubble,
-        [{opacity:'0',transform:'translateY(8px)'},{opacity:'1',transform:'none'}],
-        {duration:220,easing:'ease',fill:'both'}
-      );
-    }catch(e){toast('Ошибка: '+e.message,'err');}
-    finally{sendBtn.disabled=false;sendBtn.textContent='Отправить';}
-  });
-  wrap.appendChild(form);
-  return wrap;
-}
 function buildEmbed(raw){
   const wrap=document.createElement('div');
   const u=raw.trim();if(!u){wrap.classList.add('hidden');return wrap;}

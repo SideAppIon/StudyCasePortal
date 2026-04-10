@@ -1452,6 +1452,8 @@ async function loadGrades(){
     });
   }
 }
+
+async function loadMyGrades(){
   const snap=await getDocs(query(collection(db,'answers'),where('studentId','==',CU.uid),orderBy('createdAt','desc')));
   const list=$('list-mg');list.innerHTML='';
   const checked=[],pending=[];

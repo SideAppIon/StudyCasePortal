@@ -15,7 +15,8 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{scroll-behavior:smooth;}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;overflow-x:hidden;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-height:100vh;overflow-x:hidden;
+  display:flex;flex-direction:column;}
 .hidden{display:none!important;}
 .muted{color:var(--mu);font-size:.82rem;}
 .slbl{display:block;font-size:.78rem;font-weight:600;color:var(--mu);margin-bottom:.3rem;}
@@ -41,8 +42,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-hei
 .anim-delay-4  {animation-delay:.28s}
 .anim-delay-5  {animation-delay:.35s}
 
-/* Карточки анимируются через JS-класс, добавляемый после вставки в DOM */
-.card.entering{animation:fadeUp .3s ease both;}
+/* Карточки анимируются через Web Animations API в JS — не через CSS классы */
 
 /* ── NAV ───────────────────────────────────────────────── */
 #app-nav{position:sticky;top:0;z-index:100;background:var(--sf);
@@ -68,8 +68,8 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--tx);min-hei
 .nbtn:hover::after{width:70%;}
 .nbtn:active{transform:scale(.95);}
 
-/* ── SCREENS ─────────────────────────────────────────────── */
-.screen{padding:1.7rem 1.2rem;max-width:880px;margin:0 auto;}
+/* Экраны растягиваются чтобы футер был внизу */
+.screen{padding:1.7rem 1.2rem;max-width:880px;margin:0 auto;width:100%;flex:1;}
 
 /* ── LOGIN ─────────────────────────────────────────────── */
 #screen-login{display:flex;align-items:center;justify-content:center;
@@ -137,7 +137,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 
 /* ── PAGE HEADERS ─────────────────────────────────────────── */
 .ph{display:flex;align-items:center;gap:.85rem;margin-bottom:1.3rem;flex-wrap:wrap;
-  animation:fadeUp .3s ease;}
+  }
 .ph h1{font-family:'Sora',sans-serif;font-size:1.4rem;font-weight:700;flex:1;}
 .bbk{background:none;border:none;cursor:pointer;color:var(--ac);font-size:.84rem;
   font-family:'Inter',sans-serif;font-weight:600;padding:.3rem .5rem;border-radius:var(--rds);
@@ -157,11 +157,10 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 
 /* ── TOPIC EDITOR ─────────────────────────────────────────── */
 .etb{display:flex;gap:.45rem;flex-wrap:wrap;padding:.85rem;background:var(--sf);
-  border-radius:var(--rd);border:1px solid var(--br);margin-bottom:1rem;
-  animation:fadeUp .3s ease;}
+  border-radius:var(--rd);border:1px solid var(--br);margin-bottom:1rem;}
 .etb span{font-size:.78rem;font-weight:600;color:var(--mu);align-self:center;margin-right:.2rem;}
 .bwrap{background:var(--sf);border:1.5px solid var(--br);border-radius:var(--rd);
-  margin-bottom:.65rem;overflow:hidden;animation:slideRight .25s ease both;
+  margin-bottom:.65rem;overflow:hidden;
   transition:border-color .2s,box-shadow .2s;}
 .bwrap:hover{border-color:rgba(37,99,235,.25);box-shadow:0 2px 10px rgba(37,99,235,.07);}
 .bhdr{display:flex;align-items:center;justify-content:space-between;
@@ -184,7 +183,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   padding-top:.9rem;border-top:1px solid var(--br);}
 
 /* ── TOPIC CONTENT ────────────────────────────────────────── */
-.tblock{margin-bottom:1.6rem;animation:fadeUp .3s ease both;}
+.tblock{margin-bottom:1.6rem;}
 .tblock:nth-child(1){animation-delay:.05s}.tblock:nth-child(2){animation-delay:.1s}
 .tblock:nth-child(3){animation-delay:.15s}.tblock:nth-child(n+4){animation-delay:.2s}
 .ttext{line-height:1.82;font-size:.96rem;}
@@ -209,7 +208,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .pans{background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);
   padding:.6rem .82rem;font-size:.9rem;}
 .fbok{background:linear-gradient(135deg,#D1FAE5,#ECFDF5);border-radius:var(--rd);
-  padding:1rem 1.15rem;border:1px solid #A7F3D0;animation:pop .4s ease;}
+  padding:1rem 1.15rem;border:1px solid #A7F3D0;}
 .fbok h4{margin-bottom:.4rem;color:#065F46;font-size:.93rem;}
 .fbwait{background:linear-gradient(135deg,#FEF3C7,#FFFBEB);border-radius:var(--rd);
   padding:1rem 1.15rem;color:#92400E;font-weight:600;font-size:.88rem;
@@ -239,7 +238,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .fbinp{min-height:52px;}.fbbtn{flex-shrink:0;align-self:flex-end;}
 
 /* ── GRADES JOURNAL ──────────────────────────────────────── */
-.gsec{margin-bottom:1.4rem;animation:fadeUp .3s ease both;}
+.gsec{margin-bottom:1.4rem;}
 .gname{font-size:.95rem;font-weight:700;color:var(--ac);margin-bottom:.5rem;}
 .grow{display:flex;align-items:center;gap:.7rem;padding:.5rem .75rem;
   background:var(--sf);border:1px solid var(--br);border-radius:var(--rds);
@@ -266,7 +265,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 .grade-list{display:flex;flex-direction:column;gap:.45rem;margin-bottom:1rem;}
 .grade-item{display:flex;align-items:center;gap:.6rem;padding:.5rem .75rem;
   background:var(--bg);border-radius:var(--rds);border:1px solid var(--br);
-  animation:slideRight .25s ease both;transition:box-shadow .15s;}
+  transition:box-shadow .15s;}
 .grade-item:hover{box-shadow:var(--sh);}
 .grade-item .gi-label{flex:1;font-weight:600;font-size:.9rem;}
 .grade-item .gi-color{width:22px;height:22px;border-radius:50%;flex-shrink:0;border:2px solid rgba(0,0,0,.1);}
@@ -325,11 +324,24 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
   .grade-add-form{flex-direction:column;}
 }
 
-/* ── FOOTER ─────────────────────────────────────────────── */
+/* ── COMMENTS ─────────────────────────────────────────────── */
+.comments-wrap{margin-top:1.75rem;padding-top:1.25rem;border-top:2px solid var(--br);}
+.comments-title{font-size:1rem;font-weight:700;margin-bottom:.9rem;color:var(--tx);}
+.comments-list{display:flex;flex-direction:column;gap:.6rem;margin-bottom:1rem;}
+.comment-bubble{max-width:80%;padding:.6rem .85rem;border-radius:12px;font-size:.88rem;
+  line-height:1.55;}
+.comment-me{align-self:flex-end;background:var(--ac-lt);border:1px solid #BFDBFE;}
+.comment-other{align-self:flex-start;background:var(--sf);border:1px solid var(--br);}
+.comment-author{font-size:.72rem;font-weight:700;color:var(--mu);margin-bottom:.2rem;}
+.comment-text{color:var(--tx);}
+.comment-time{font-size:.68rem;color:var(--mu);margin-top:.25rem;text-align:right;}
+.comment-form{display:flex;gap:.6rem;align-items:flex-end;}
+.comment-ta{flex:1;min-height:60px;border-radius:var(--rds);}
+.comment-send{flex-shrink:0;align-self:flex-end;}
 #site-footer{
   background:var(--sf);border-top:1px solid var(--br);
-  padding:.75rem 1.2rem;margin-top:2rem;
-  display:flex;justify-content:center;}
+  padding:.75rem 1.2rem;margin-top:auto;
+  display:flex;justify-content:center;flex-shrink:0;}
 .footer-inner{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;justify-content:center;}
 .footer-brand{font-size:.78rem;color:var(--mu);text-decoration:none;font-weight:500;
   transition:color .15s;}
@@ -345,7 +357,7 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 
 /* ── SETTINGS BLOCKS ─────────────────────────────────────── */
 .settings-block{background:var(--sf);border:1px solid var(--br);border-radius:var(--rd);
-  padding:1.25rem 1.4rem;animation:fadeUp .3s ease both;}
+  padding:1.25rem 1.4rem;}
 .settings-h2{font-family:'Sora',sans-serif;font-size:1rem;font-weight:700;margin-bottom:.75rem;}
 .toggle-row{display:flex;align-items:center;gap:.65rem;cursor:pointer;font-size:.9rem;
   padding:.3rem 0;}
@@ -495,6 +507,12 @@ match /grades/{doc} {
 match /groups/{doc} {
   allow read: if request.auth != null;
   allow write: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+}
+
+match /comments/{doc} {
+  allow read: if request.auth != null;
+  allow create: if request.auth != null;
+  allow update, delete: if request.auth.uid == resource.data.authorId;
 }</pre>
   </div>
 </div>
@@ -681,13 +699,16 @@ function toast(msg,type=''){
   setTimeout(()=>{t.style.animation='fadeIn .2s ease reverse';setTimeout(()=>t.remove(),200);},3300);
 }
 
-// animCard — вставляет карточку в список И запускает анимацию ровно один раз
-// delay в секундах, например 0.06 * i
+// animCard — вставляет карточку и запускает анимацию ровно ОДИН РАЗ
+// Использует Web Animations API (el.animate) — не CSS-классы, не style.animation
+// Это единственный надёжный способ: анимация привязана к конкретному вызову,
+// а не к CSS-классу который браузер может не перезапустить при повторном добавлении
 function animCard(parent, el, delay=0){
-  el.style.animationDelay = delay+'s';
   parent.appendChild(el);
-  // Двойной rAF гарантирует что браузер видит элемент в DOM перед добавлением класса
-  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('entering')));
+  el.animate(
+    [{opacity:'0', transform:'translateY(14px)'},{opacity:'1', transform:'none'}],
+    {duration:280, delay:delay*1000, easing:'ease', fill:'both'}
+  );
 }
 
 // ── State ──────────────────────────────────────────────────────
@@ -800,12 +821,13 @@ function renderGradeSettings(){
   if(!GRADES.length){list.innerHTML='<p class="empty">Оценок нет. Создай первую!</p>';return;}
   GRADES.forEach((g,idx)=>{
     const item=document.createElement('div');item.className='grade-item';
-    item.style.animationDelay=idx*0.05+'s';
     const col=g.color||'#64748B';
     item.innerHTML=`<div class="gi-color" style="background:${col}"></div>
       <span class="gi-label">${esc(g.label)}</span>
       <button class="btn bg btn-sm" data-action="delgrade" data-id="${g.id}">Удалить</button>`;
     list.appendChild(item);
+    item.animate([{opacity:'0',transform:'translateX(-12px)'},{opacity:'1',transform:'none'}],
+      {duration:240,delay:idx*50,easing:'ease',fill:'both'});
   });
 }
 
@@ -840,13 +862,12 @@ async function loadGroups(){
   if(!GROUPS.length){list.innerHTML='<p class="empty">Групп нет. Создай первую!</p>';return;}
   GROUPS.forEach((g,gi)=>{
     const card=document.createElement('div');card.className='card';
-        card.style.animationDelay=(gi*0.06)+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(g.name)}</h3><p>${esc(g.description||'')}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="editgrp" data-id="${g.id}" data-name="${esc(g.name)}" data-desc="${esc(g.description||'')}">✏ Изменить</button>
         <button class="btn bg btn-sm" data-action="delgrp" data-id="${g.id}">Удалить</button>
       </div>`;
-    animCard(list, card);
+    animCard(list, card, gi*0.06);
   });
 }
 
@@ -990,14 +1011,13 @@ async function loadCourses(){
   snap.forEach((d,i)=>{
     const c=d.data();
     const card=document.createElement('div');card.className='card';
-        card.style.animationDelay=(i*0.06)+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="topics" data-id="${d.id}" data-title="${esc(c.title)}">Темы</button>
         <button class="btn ba btn-sm" data-action="caccess" data-id="${d.id}" data-title="${esc(c.title)}">Доступ</button>
         <button class="btn bg btn-sm" data-action="delcourse" data-id="${d.id}">Удалить</button>
       </div>`;
-    animCard(list, card);
+    animCard(list, card, i*0.06);
   });
 }
 $('list-ac').addEventListener('click',async e=>{
@@ -1057,14 +1077,13 @@ async function loadTopics(){
   topics.forEach((t,i)=>{
     const bc=(t.blocks||[]).length;
     const card=document.createElement('div');card.className='card';
-        card.style.animationDelay=(i*0.06)+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(t.title)}</h3><p class="muted">Порядок: ${t.order||0} · Блоков: ${bc}</p></div>
       <div class="ca">
         <button class="btn bs btn-sm" data-action="edittopic" data-id="${t.id}">✏ Редактировать</button>
         <button class="btn ba btn-sm" data-action="taccess" data-id="${t.id}" data-title="${esc(t.title)}">🔓 Доступ</button>
         <button class="btn bg btn-sm" data-action="deltopic" data-id="${t.id}">Удалить</button>
       </div>`;
-    animCard(list, card);
+    animCard(list, card, i*0.06);
   });
 }
 $('list-at').addEventListener('click',async e=>{
@@ -1124,7 +1143,7 @@ function renderEditor(){
   const c=$('blocks');c.innerHTML='';
   if(!EB.length){c.innerHTML='<p class="empty">Нет блоков. Добавь кнопками выше.</p>';return;}
   EB.forEach((b,i)=>{
-    const w=document.createElement('div');w.className='bwrap';w.style.animationDelay=i*0.04+'s';
+    const w=document.createElement('div');w.className='bwrap';
     const nm=b.type==='text'?'📝 Текст':b.type==='image'?'🖼 Картинка':b.type==='video'?'▶ Видео':'❓ Вопрос';
     let body='';
     if(b.type==='text')     body=`<textarea id="bc${i}" class="bta" placeholder="Введи текст...">${esc(b.content||'')}</textarea>`;
@@ -1144,6 +1163,8 @@ function renderEditor(){
         <button class="xbtn xdel" data-baction="del" data-idx="${i}">✕</button>
       </div></div><div class="bbody">${body}</div>`;
     c.appendChild(w);
+    w.animate([{opacity:'0',transform:'translateX(-10px)'},{opacity:'1',transform:'none'}],
+      {duration:220,delay:i*40,easing:'ease',fill:'both'});
   });
 }
 
@@ -1198,7 +1219,6 @@ async function loadUsers(){
       const rl=u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
       const grp=u.groupName?` <span class="grptag">${esc(u.groupName)}</span>`:'';
       const card=document.createElement('div');card.className='card';
-          card.style.animationDelay=(i*0.04)+'s';
       card.innerHTML=`<div class="ci"><h3>${esc(u.name||'—')}</h3>
         <p>${esc(u.email)} · <span class="rbadge r${u.role[0]}">${rl}</span>${grp}</p></div>
         <div class="ca">
@@ -1206,7 +1226,7 @@ async function loadUsers(){
           <button class="btn bw btn-sm" data-action="resetpw"  data-id="${u.id}" data-name="${esc(u.name||u.email)}">🔑 Пароль</button>
           <button class="btn bg btn-sm" data-action="deluser"  data-id="${u.id}">Удалить</button>
         </div>`;
-      animCard(list, card);
+      animCard(list, card, i*0.04);
     });
   }
   render();
@@ -1303,7 +1323,6 @@ async function loadAnswers(){
     const savedGrade=GRADES.find(g=>g.id===a.gradeId);
     const gh=savedGrade?gradeChip(savedGrade):'';
     const card=document.createElement('div');card.className='card acard';
-        card.style.animationDelay=(i*0.04)+'s';
 
     // Build grade options
     const gradeOpts=GRADES.map(g=>`<option value="${g.id}" ${a.gradeId===g.id?'selected':''}>${esc(g.label)}</option>`).join('');
@@ -1325,12 +1344,15 @@ async function loadAnswers(){
             ${gradeOpts}
           </select>
         </div>
-        <div class="fbr"><label class="slbl">Комментарий</label>
+        <div class="fbr"><label class="slbl">Комментарий преподавателя</label>
           <textarea class="fbinp" id="fb${d.id}" placeholder="Комментарий...">${esc(a.feedback||'')}</textarea>
         </div>
         <button class="btn bp fbbtn" data-aid="${d.id}">Сохранить</button>
-      </div>`;
-    animCard(list, card);
+      </div>
+      <div class="answer-chat-wrap" id="chat-${d.id}"></div>
+      <button class="btn bs btn-sm answer-chat-toggle" data-tid="${a.topicId}" data-cid="${a.courseId}" data-chatid="${d.id}"
+        style="margin-top:.5rem;font-size:.76rem">💬 Открыть обсуждение со студентом</button>`;
+    animCard(list, card, i*0.04);
   });
 }
 $('list-ta').addEventListener('click',async e=>{
@@ -1348,6 +1370,27 @@ $('list-ta').addEventListener('click',async e=>{
 $('asearch').addEventListener('input',function(){
   const q=this.value.toLowerCase();
   document.querySelectorAll('.acard').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
+});
+
+// Открыть/закрыть обсуждение в карточке ответа (учитель)
+$('list-ta').addEventListener('click',async e=>{
+  const tog=e.target.closest('.answer-chat-toggle');if(!tog)return;
+  const {tid,cid,chatid}=tog.dataset;
+  const wrap=$('chat-'+chatid);
+  if(wrap.dataset.loaded){
+    // Скрыть/показать
+    wrap.style.display = wrap.style.display==='none' ? '' : 'none';
+    tog.textContent = wrap.style.display==='none' ? '💬 Открыть обсуждение со студентом' : '💬 Скрыть обсуждение';
+    return;
+  }
+  // Первый раз — загружаем
+  const prevCID = CID;
+  CID = cid; // временно ставим courseId чтобы buildCommentsSection мог его использовать
+  const section = await buildCommentsSection(tid);
+  CID = prevCID;
+  wrap.appendChild(section);
+  wrap.dataset.loaded='1';
+  tog.textContent='💬 Скрыть обсуждение';
 });
 
 // ── Grades journal — разделён на проверенные / непроверенные ────
@@ -1371,7 +1414,6 @@ async function loadGrades(){
     pending.forEach(a=>{const n=a.studentName||a.studentEmail;(byStudent[n]=byStudent[n]||[]).push(a);});
     Object.entries(byStudent).forEach(([name,entries],si)=>{
       const sec=document.createElement('div');sec.className='gsec';
-          sec.style.animationDelay=(si*0.05)+'s';
       sec.innerHTML=`<h3 class="gname">${esc(name)}</h3>`;
       entries.forEach(a=>{
         const row=document.createElement('div');row.className='grow';
@@ -1381,6 +1423,8 @@ async function loadGrades(){
         sec.appendChild(row);
       });
       list.appendChild(sec);
+      sec.animate([{opacity:'0',transform:'translateY(10px)'},{opacity:'1',transform:'none'}],
+        {duration:260,delay:si*60,easing:'ease',fill:'both'});
     });
   }
 
@@ -1393,7 +1437,6 @@ async function loadGrades(){
     checked.forEach(a=>{const n=a.studentName||a.studentEmail;(byStudent[n]=byStudent[n]||[]).push(a);});
     Object.entries(byStudent).forEach(([name,entries],si)=>{
       const sec=document.createElement('div');sec.className='gsec';
-          sec.style.animationDelay=(si*0.05)+'s';
       sec.innerHTML=`<h3 class="gname">${esc(name)}</h3>`;
       entries.forEach(a=>{
         const g=GRADES.find(x=>x.id===a.gradeId);
@@ -1404,11 +1447,11 @@ async function loadGrades(){
         sec.appendChild(row);
       });
       list.appendChild(sec);
+      sec.animate([{opacity:'0',transform:'translateY(10px)'},{opacity:'1',transform:'none'}],
+        {duration:260,delay:si*60,easing:'ease',fill:'both'});
     });
   }
 }
-
-async function loadMyGrades(){
   const snap=await getDocs(query(collection(db,'answers'),where('studentId','==',CU.uid),orderBy('createdAt','desc')));
   const list=$('list-mg');list.innerHTML='';
   const checked=[],pending=[];
@@ -1421,11 +1464,10 @@ async function loadMyGrades(){
     list.appendChild(hdr);
     pending.forEach((a,i)=>{
       const card=document.createElement('div');card.className='card';
-          card.style.animationDelay=(i*0.05)+'s';
       card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
         <p class="muted">${fmt(a.createdAt)}</p></div>
         <span class="sbadge spend">⏳ На проверке</span>`;
-      animCard(list, card);
+      animCard(list, card, i*0.05);
     });
   }
 
@@ -1436,12 +1478,11 @@ async function loadMyGrades(){
     checked.forEach((a,i)=>{
       const g=GRADES.find(x=>x.id===a.gradeId);
       const card=document.createElement('div');card.className='card';
-          card.style.animationDelay=(i*0.05)+'s';
       card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
         <p class="muted">${fmt(a.checkedAt)}</p>
         ${a.feedback?`<p class="gfb">💬 ${esc(a.feedback)}</p>`:''}</div>
         ${g?gradeChip(g,true):''}`;
-      animCard(list, card);
+      animCard(list, card, i*0.05);
     });
   }
 }
@@ -1461,10 +1502,9 @@ async function loadMyCourses(){
   if(!visible.length){list.innerHTML='<p class="empty">Тебе пока не открыт доступ ни к одному курсу</p>';return;}
   visible.forEach((c,i)=>{
     const card=document.createElement('div');card.className='card clk';
-        card.style.animationDelay=(i*0.07)+'s';
     card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div><div class="carrow">→</div>`;
     card.addEventListener('click',()=>openCourse(c.id,c.title));
-    animCard(list, card);
+    animCard(list, card, i*0.07);
   });
 }
 async function openCourse(courseId,courseTitle){
@@ -1482,12 +1522,11 @@ async function loadMyTopics(courseId){
     const ok=aSnap.exists();
     const qc=(t.blocks||[]).filter(b=>b.type==='question').length;
     const card=document.createElement('div');card.className=`card ${ok?'clk':'locked'}`;
-        card.style.animationDelay=(ti*0.06)+'s';
     card.innerHTML=`<div class="licon">${ok?'📖':'🔒'}</div>
       <div class="ci"><h3>${esc(t.title)}</h3>
       <p>${ok?(qc?`${qc} вопрос(а)`:'Материал для изучения'):'Заблокировано'}</p></div>`;
     if(ok)card.addEventListener('click',()=>openTopicView(t));
-    animCard(list, card);
+    animCard(list, card, ti*0.06);
   }
 }
 async function openTopicView(topic){
@@ -1521,12 +1560,21 @@ async function openTopicView(topic){
   const st=$('topic-status');st.innerHTML='';
   if(qblocks.length){
     if(prev?.status==='checked'){
+      // Показываем оценку и комментарий преподавателя
       const g=GRADES.find(x=>x.id===prev.gradeId);
       const gh=g?gradeChip(g,true):'';
-      st.innerHTML=`<div class="fbok"><h4>✅ Ответ проверен ${gh}</h4>
-        <p>${prev.feedback?esc(prev.feedback):'Комментарий не добавлен'}</p></div>`;
+      const fbDiv=document.createElement('div');fbDiv.className='fbok';
+      fbDiv.innerHTML=`<h4>✅ Ответ проверен ${gh}</h4>
+        <p>${prev.feedback?esc(prev.feedback):'Комментарий не добавлен'}</p>`;
+      st.appendChild(fbDiv);
+      // Раздел комментариев
+      st.appendChild(await buildCommentsSection(topic.id));
     } else if(prev?.status==='pending'){
-      st.innerHTML=`<div class="fbwait">⏳ Ответ отправлен на проверку</div>`;
+      const w=document.createElement('div');w.className='fbwait';
+      w.textContent='⏳ Ответ отправлен на проверку';
+      st.appendChild(w);
+      // Студент может оставить комментарий и пока ждёт
+      st.appendChild(await buildCommentsSection(topic.id));
     } else {
       const btn=document.createElement('button');btn.className='btn bsubmit';
       btn.textContent='Отправить ответы на проверку';
@@ -1535,6 +1583,62 @@ async function openTopicView(topic){
     }
   }
   show('screen-sv');
+}
+
+// ── Система комментариев к теме ────────────────────────────────
+async function buildCommentsSection(topicId){
+  const wrap=document.createElement('div');wrap.className='comments-wrap';
+  wrap.innerHTML='<h3 class="comments-title">💬 Обсуждение</h3>';
+
+  // Загружаем комментарии
+  const snap=await getDocs(query(
+    collection(db,'comments'),
+    where('topicId','==',topicId),
+    where('courseId','==',CID),
+    orderBy('createdAt','asc')
+  ));
+
+  const list=document.createElement('div');list.className='comments-list';
+  if(snap.empty){
+    list.innerHTML='<p class="empty" style="padding:.75rem 0">Комментариев нет — будь первым!</p>';
+  } else {
+    snap.forEach(d=>{
+      const c=d.data();
+      const isMe = c.authorId===CU.uid;
+      const bubble=document.createElement('div');
+      bubble.className='comment-bubble '+(isMe?'comment-me':'comment-other');
+      bubble.innerHTML=`
+        <div class="comment-author">${esc(c.authorName||c.authorEmail)}${isMe?' (Вы)':''}</div>
+        <div class="comment-text">${esc(c.text).replace(/\n/g,'<br/>')}</div>
+        <div class="comment-time">${fmt(c.createdAt)}</div>`;
+      list.appendChild(bubble);
+    });
+  }
+  wrap.appendChild(list);
+
+  // Форма отправки нового комментария
+  const form=document.createElement('div');form.className='comment-form';
+  form.innerHTML=`<textarea class="comment-ta" placeholder="Написать комментарий..."></textarea>
+    <button class="btn bp btn-sm comment-send">Отправить</button>`;
+  form.querySelector('.comment-send').addEventListener('click',async()=>{
+    const ta=form.querySelector('textarea');
+    const text=ta.value.trim();
+    if(!text){toast('Введи текст комментария','err');return;}
+    await addDoc(collection(db,'comments'),{
+      topicId, courseId:CID,
+      authorId:CU.uid, authorEmail:CU.email,
+      authorName:UP.name||CU.email,
+      role:UP.role, text,
+      createdAt:serverTimestamp()
+    });
+    ta.value='';
+    toast('Комментарий отправлен','ok');
+    // Перезагружаем раздел комментариев
+    const newSection=await buildCommentsSection(topicId);
+    wrap.replaceWith(newSection);
+  });
+  wrap.appendChild(form);
+  return wrap;
 }
 function buildEmbed(raw){
   const wrap=document.createElement('div');

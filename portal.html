@@ -1540,10 +1540,14 @@ async function loadGrades(){
 }
 
 async function loadMyGrades(){
-  const snap=await getDocs(query(collection(db,'answers'),where('studentId','==',CU.uid),orderBy('createdAt','desc')));
+  // Без orderBy — составной индекс не нужен, сортируем на клиенте
+  const snap=await getDocs(query(collection(db,'answers'),where('studentId','==',CU.uid)));
   const list=$('list-mg');list.innerHTML='';
+  const allDocs=[...snap.docs].map(d=>d.data()).sort((a,b)=>{
+    const ta=a.createdAt?.toMillis?.()??0, tb=b.createdAt?.toMillis?.()??0; return tb-ta;
+  });
   const checked=[],pending=[];
-  snap.forEach(d=>{const a=d.data();if(a.status==='checked')checked.push(a);else pending.push(a);});
+  allDocs.forEach(a=>{if(a.status==='checked')checked.push(a);else pending.push(a);});
   if(!checked.length&&!pending.length){list.innerHTML='<p class="empty">Ответов нет</p>';return;}
 
   if(pending.length){
@@ -1619,8 +1623,10 @@ async function loadMyTopics(courseId){
 }
 async function openTopicView(topic){
   $('lbl-sv').textContent=topic.title;
-  const prevSnap=await getDocs(query(collection(db,'answers'),where('studentId','==',CU.uid),where('topicId','==',topic.id)));
-  let prev=null;prevSnap.forEach(d=>prev=d.data());
+  // Один where() — составной индекс не нужен; фильтруем studentId на клиенте
+  const prevSnap=await getDocs(query(collection(db,'answers'),where('topicId','==',topic.id)));
+  let prev=null;
+  prevSnap.forEach(d=>{const a=d.data();if(a.studentId===CU.uid)prev=a;});
   const cont=$('topic-content');cont.innerHTML='';
   const qblocks=[];
   (topic.blocks||[]).forEach(block=>{
@@ -1678,19 +1684,24 @@ async function buildCommentsSection(topicId){
   const wrap=document.createElement('div');wrap.className='comments-wrap';
   wrap.innerHTML='<h3 class="comments-title">💬 Обсуждение</h3>';
 
-  // Загружаем комментарии
+  // Загружаем комментарии — без orderBy чтобы не требовался составной индекс
   const snap=await getDocs(query(
     collection(db,'comments'),
     where('topicId','==',topicId),
-    where('courseId','==',CID),
-    orderBy('createdAt','asc')
+    where('courseId','==',CID)
   ));
 
   const list=document.createElement('div');list.className='comments-list';
-  if(snap.empty){
+  // Сортировка на клиенте по времени создания
+  const commentDocs=[...snap.docs].sort((a,b)=>{
+    const ta=a.data().createdAt?.toMillis?.()??0;
+    const tb=b.data().createdAt?.toMillis?.()??0;
+    return ta-tb;
+  });
+  if(!commentDocs.length){
     list.innerHTML='<p class="empty" style="padding:.75rem 0">Комментариев нет — будь первым!</p>';
   } else {
-    snap.forEach(d=>{
+    commentDocs.forEach(d=>{
       const c=d.data();
       const isMe = c.authorId===CU.uid;
       const bubble=document.createElement('div');

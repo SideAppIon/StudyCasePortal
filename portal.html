@@ -1355,7 +1355,7 @@ async function loadAnswers(){
     const gh=savedGrade?gradeChip(savedGrade):'';
     const card=document.createElement('div');card.className='card acard';
 
-    // Build grade options
+ // Build grade options
     const gradeOpts=GRADES.map(g=>`<option value="${g.id}" ${a.gradeId===g.id?'selected':''}>${esc(g.label)}</option>`).join('');
 
     card.innerHTML=`
@@ -1381,7 +1381,7 @@ async function loadAnswers(){
         <button class="btn bp fbbtn" data-aid="${d.id}">Сохранить</button>
       </div>
       <div class="answer-chat-wrap" id="chat-${d.id}"></div>
-      <button class="btn bs btn-sm answer-chat-toggle" data-tid="${a.topicId}" data-cid="${a.courseId}" data-chatid="${d.id}"
+      <button class="btn bs btn-sm answer-chat-toggle" data-tid="${a.topicId}" data-cid="${a.courseId}" data-chatid="${d.id}" data-answerid="${a.answerId}"
         style="margin-top:.5rem;font-size:.76rem">💬 Открыть обсуждение со студентом</button>`;
     animCard(list, card, i*0.04);
   });
@@ -1484,6 +1484,7 @@ async function loadAnswerChat(container, topicId, courseId, answerId){
     container.innerHTML='<p class="empty" style="color:var(--red)">Ошибка загрузки чата</p>';
   }
 }
+
 $('asearch').addEventListener('input',function(){
   const q=this.value.toLowerCase();
   document.querySelectorAll('.acard').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
@@ -1503,7 +1504,7 @@ $('list-ta').addEventListener('click',async e=>{
   // Первый раз — загружаем
   const prevCID = CID;
   CID = cid; // временно ставим courseId чтобы buildCommentsSection мог его использовать
-  const section = await buildCommentsSection(tid);
+  const section = await buildCommentsSection(tid, chatid);
   CID = prevCID;
   wrap.appendChild(section);
   wrap.dataset.loaded='1';
@@ -1793,7 +1794,7 @@ async function buildStudentAnswersSection(topicId){
 }
 
 // ── Система комментариев к теме ───────────────────────────────────
-async function buildCommentsSection(topicId){
+async function buildCommentsSection(topicId, answerId = null){
   const wrap=document.createElement('div');wrap.className='comments-wrap';
   wrap.innerHTML='<h3 class="comments-title">💬 Обсуждение с преподавателем</h3>';
 

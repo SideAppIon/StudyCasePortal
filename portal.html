@@ -286,8 +286,14 @@ textarea{min-height:76px;resize:vertical;line-height:1.55;}
 /* ── GRADES JOURNAL SECTIONS ─────────────────────────────── */
 .gj-section-hdr{display:flex;align-items:center;gap:.5rem;
   font-size:.82rem;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;
-  margin:1.4rem 0 .6rem;padding-bottom:.4rem;border-bottom:2px solid var(--br);}
+  margin:1.4rem 0 .6rem;padding-bottom:.4rem;border-bottom:2px solid var(--br);
+  cursor:pointer;user-select:none;border-radius:var(--rds);padding:.45rem .55rem;
+  transition:background .15s;}
+.gj-section-hdr:hover{background:var(--bg);}
 .gj-section-hdr:first-child{margin-top:0;}
+.gj-arrow{margin-left:auto;font-size:.8rem;transition:transform .22s;color:var(--mu);}
+.gj-arrow.open{transform:rotate(90deg);}
+.gj-body{overflow:hidden;transition:max-height .28s ease;}
 .gj-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .gj-dot-pend{background:#F59E0B;}
 .gj-dot-chk {background:#22C55E;}
@@ -459,7 +465,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.82em;
   <!-- Логотип -->
   <div class="settings-block" style="margin-top:1.5rem">
     <h2 class="settings-h2">🖼 Логотип</h2>
-    <p class="muted" style="margin-bottom:.9rem">Положи <code>logo.png</code> рядом с <code>portal.html</code> в репозитории. Ниже можно отключить логотип на отдельных местах.</p>
+    <p class="muted" style="margin-bottom:.9rem">Управляй видимостью логотипа на разных страницах.</p>
     <div style="display:flex;flex-direction:column;gap:.6rem">
       <label class="toggle-row"><input type="checkbox" id="tog-logo-nav" checked/><span>Показывать логотип в шапке (навигация)</span></label>
       <label class="toggle-row"><input type="checkbox" id="tog-logo-login" checked/><span>Показывать логотип на странице входа</span></label>
@@ -478,6 +484,71 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.82em;
     <button class="btn bp btn-sm" id="btn-save-footer">Сохранить</button>
   </div>
 
+  <!-- Правила Firebase -->
+  <div class="settings-block" style="margin-top:1.5rem;background:#FFFBEB;border-color:#FDE68A">
+    <h2 class="settings-h2">⚠️ Полные правила Firestore (замени целиком)</h2>
+    <p class="muted" style="margin-bottom:.75rem;font-size:.82rem">Открой Firebase → Firestore → Rules и замени содержимое полностью на это:</p>
+    <pre style="background:var(--bg);padding:.9rem;border-radius:8px;font-size:.75rem;overflow-x:auto;border:1px solid var(--br)">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isLoggedIn() { return request.auth != null; }
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+    function userExists() { return isLoggedIn() &amp;&amp; exists(userDocPath()); }
+    function getUser() { return get(userDocPath()); }
+    function isAdmin()   { return userExists() &amp;&amp; getUser().data.role == 'admin'; }
+    function isTeacher() { return userExists() &amp;&amp; getUser().data.role == 'teacher'; }
+    function isStudent() { return userExists() &amp;&amp; getUser().data.role == 'student'; }
+
+    match /users/{userId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    match /groups/{groupId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    match /grades/{gradeId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    match /settings/{docId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+    }
+    match /courses/{courseId} {
+      allow read: if isLoggedIn();
+      allow write: if isAdmin();
+      match /enrollments/{userId} {
+        allow read: if isLoggedIn();
+        allow write: if isAdmin();
+      }
+      match /topics/{topicId} {
+        allow read: if isLoggedIn();
+        allow write: if isAdmin();
+        match /access/{userId} {
+          allow read: if isLoggedIn();
+          allow write: if isAdmin();
+        }
+      }
+    }
+    match /answers/{answerId} {
+      allow read: if isAdmin() || isTeacher()
+        || (isLoggedIn() &amp;&amp; request.auth.uid == resource.data.studentId);
+      allow create: if isLoggedIn();
+      allow update: if isAdmin() || isTeacher();
+      allow delete: if isAdmin();
+    }
+    match /comments/{commentId} {
+      allow read: if isLoggedIn();
+      allow create: if isLoggedIn();
+      allow update, delete: if isLoggedIn()
+        &amp;&amp; request.auth.uid == resource.data.authorId;
+    }
+  }
+}</pre>
+  </div>
 </div>
 
 
@@ -604,7 +675,7 @@ code{background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.82em;
      ════════════════════════════════════════════════════════════ -->
 <script type="module">
 import { initializeApp }  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, updatePassword }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import { getFirestore, collection, doc, getDocs, getDoc, setDoc, addDoc,
   updateDoc, deleteDoc, query, where, orderBy, serverTimestamp }
@@ -766,6 +837,14 @@ onAuthStateChanged(auth,async user=>{
   const snap=await getDoc(doc(db,'users',user.uid));
   if(!snap.exists()){await signOut(auth);show('screen-login');toast('Пользователь не найден','err');return;}
   CU=user;UP=snap.data();
+  // Применяем новый пароль если администратор его сменил
+  if(UP.pendingPassword){
+    try{
+      await updatePassword(user, UP.pendingPassword);
+      await updateDoc(doc(db,'users',user.uid),{pendingPassword:''});
+      UP.pendingPassword='';
+    }catch(e){console.warn('pendingPassword apply failed:',e.message);}
+  }
   await Promise.all([loadGradesCache(),loadGroupsCache(),loadSiteSettings()]);
   applyNav();
   if(UP.role==='admin')       {await loadCourses();show('screen-ac');}
@@ -996,16 +1075,6 @@ function buildGroupTabs(containerId,listId,allStudents,checkedSet,filterFn){
       else                       { activeGroups.add(g.id);    btn.classList.add('active'); }
       if(activeGroups.size===0) allBtn.classList.add('active');
       else                      allBtn.classList.remove('active');
-      
-      // Auto-select all students in the selected group
-      if(activeGroups.has(g.id)){
-        allStudents.forEach(([uid,u])=>{
-          if(u.groupId === g.id){
-            accessMap.set(uid, true);
-          }
-        });
-      }
-      
       render();
     });
     tabsEl.appendChild(btn);
@@ -1316,28 +1385,22 @@ $('nu-save').onclick=async()=>{
 };
 
 // ── Reset password ─────────────────────────────────────────────
+// Firebase без Admin SDK не позволяет менять пароль чужого аккаунта напрямую.
+// Рабочая схема: сохраняем новый пароль в Firestore (pendingPassword).
+// При следующем входе пользователя — updatePassword применяется автоматически.
 $('rp-cancel').onclick=()=>mhide('m-rp');
 $('rp-save').onclick=async()=>{
   const newPass=$('rp-pass').value;
   if(!newPass||newPass.length<6){toast('Пароль минимум 6 символов','err');return;}
-  // Сброс через Firebase Auth REST API
+  const btn=$('rp-save');btn.disabled=true;btn.textContent='Сохраняю...';
   try{
-    // Получаем idToken через signIn с email — нет прямого способа поменять чужой пароль без Admin SDK
-    // Используем updatePassword через обновление пользователя напрямую — только через Admin SDK
-    // В браузере без Admin SDK можно только отправить email для сброса пароля
-    // Отправляем письмо сброса пароля на email пользователя
-    const snap=await getDoc(doc(db,'users',RUID));
-    const email=snap.data().email;
-    const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseConfig.apiKey}`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({requestType:'PASSWORD_RESET',email})
-    });
-    const data=await res.json();
-    if(data.error){toast('Ошибка: '+data.error.message,'err');return;}
-    toast(`Письмо для сброса пароля отправлено на ${email} ✓`,'ok');
+    await updateDoc(doc(db,'users',RUID),{pendingPassword:newPass});
+    toast('Новый пароль сохранён — применится при следующем входе ✓','ok');
     mhide('m-rp');
   }catch(e){toast('Ошибка: '+e.message,'err');}
+  finally{btn.disabled=false;btn.textContent='Сохранить';}
 };
+
 
 // ═══════════════════════════════════════════════════════════════
 //  ANSWERS + CUSTOM GRADES
@@ -1355,7 +1418,7 @@ async function loadAnswers(){
     const gh=savedGrade?gradeChip(savedGrade):'';
     const card=document.createElement('div');card.className='card acard';
 
- // Build grade options
+    // Build grade options
     const gradeOpts=GRADES.map(g=>`<option value="${g.id}" ${a.gradeId===g.id?'selected':''}>${esc(g.label)}</option>`).join('');
 
     card.innerHTML=`
@@ -1375,9 +1438,14 @@ async function loadAnswers(){
             ${gradeOpts}
           </select>
         </div>
+        <div class="fbr"><label class="slbl">Комментарий преподавателя</label>
+          <textarea class="fbinp" id="fb${d.id}" placeholder="Комментарий...">${esc(a.feedback||'')}</textarea>
+        </div>
         <button class="btn bp fbbtn" data-aid="${d.id}">Сохранить</button>
       </div>
-`;
+      <div class="answer-chat-wrap" id="chat-${d.id}"></div>
+      <button class="btn bs btn-sm answer-chat-toggle" data-tid="${a.topicId}" data-cid="${a.courseId}" data-chatid="${d.id}"
+        style="margin-top:.5rem;font-size:.76rem">💬 Открыть обсуждение со студентом</button>`;
     animCard(list, card, i*0.04);
   });
 }
@@ -1393,14 +1461,50 @@ $('list-ta').addEventListener('click',async e=>{
   btn.textContent='✓'; setTimeout(()=>{btn.textContent='Сохранить';},1500);
   loadAnswers();
 });
-
-
-
 $('asearch').addEventListener('input',function(){
   const q=this.value.toLowerCase();
   document.querySelectorAll('.acard').forEach(c=>c.style.display=c.textContent.toLowerCase().includes(q)?'':'none');
 });
 
+// Открыть/закрыть обсуждение в карточке ответа (учитель)
+$('list-ta').addEventListener('click',async e=>{
+  const tog=e.target.closest('.answer-chat-toggle');if(!tog)return;
+  const {tid,cid,chatid}=tog.dataset;
+  const wrap=$('chat-'+chatid);
+  if(wrap.dataset.loaded){
+    // Скрыть/показать
+    wrap.style.display = wrap.style.display==='none' ? '' : 'none';
+    tog.textContent = wrap.style.display==='none' ? '💬 Открыть обсуждение со студентом' : '💬 Скрыть обсуждение';
+    return;
+  }
+  // Первый раз — загружаем
+  const prevCID = CID;
+  CID = cid; // временно ставим courseId чтобы buildCommentsSection мог его использовать
+  const section = await buildCommentsSection(tid);
+  CID = prevCID;
+  wrap.appendChild(section);
+  wrap.dataset.loaded='1';
+  tog.textContent='💬 Скрыть обсуждение';
+});
+
+// ── Создаёт сворачиваемую секцию журнала оценок ──────────────
+function makeCollapsibleSection(dotClass, labelText, count, startOpen=false){
+  const wrapper=document.createElement('div');
+  const hdr=document.createElement('div');hdr.className='gj-section-hdr';
+  hdr.innerHTML=`<span class="gj-dot ${dotClass}"></span>${labelText} <span class="gj-count">${count}</span><span class="gj-arrow${startOpen?' open':''}">▶</span>`;
+  const body=document.createElement('div');body.className='gj-body';
+  body.style.maxHeight=startOpen?'9999px':'0';
+  hdr.addEventListener('click',()=>{
+    const arrow=hdr.querySelector('.gj-arrow');
+    const isOpen=arrow.classList.toggle('open');
+    body.style.maxHeight=isOpen?body.scrollHeight+'px':'0';
+    // После открытия снимаем ограничение чтобы содержимое не обрезалось
+    if(isOpen) setTimeout(()=>{if(arrow.classList.contains('open'))body.style.maxHeight='9999px';},300);
+  });
+  wrapper.appendChild(hdr);
+  wrapper.appendChild(body);
+  return {wrapper, body};
+}
 
 // ── Grades journal — разделён на проверенные / непроверенные ────
 async function loadGrades(){
@@ -1414,11 +1518,10 @@ async function loadGrades(){
   });
   if(!checked.length&&!pending.length){list.innerHTML='<p class="empty">Ответов нет</p>';return;}
 
-  // ── Секция: Непроверенные ──
+  // ── Секция: Непроверенные (свёрнута по умолчанию) ──
   if(pending.length){
-    const hdr=document.createElement('div');hdr.className='gj-section-hdr';
-    hdr.innerHTML=`<span class="gj-dot gj-dot-pend"></span>На проверке <span class="gj-count">${pending.length}</span>`;
-    list.appendChild(hdr);
+    const {wrapper:pw, body:pb}=makeCollapsibleSection('gj-dot-pend','На проверке',pending.length,true);
+    list.appendChild(pw);
     const byStudent={};
     pending.forEach(a=>{const n=a.studentName||a.studentEmail;(byStudent[n]=byStudent[n]||[]).push(a);});
     Object.entries(byStudent).forEach(([name,entries],si)=>{
@@ -1431,17 +1534,16 @@ async function loadGrades(){
           <span class="sbadge spend" style="margin-left:.5rem">⏳ Ожидает</span>`;
         sec.appendChild(row);
       });
-      list.appendChild(sec);
-      sec.animate([{opacity:'0',transform:'translateY(10px)'},{opacity:'1',transform:'none'}],
+      pb.appendChild(sec);
+      animOnce(sec,[{opacity:'0',transform:'translateY(10px)'},{opacity:'1',transform:'none'}],
         {duration:260,delay:si*60,easing:'ease',fill:'both'});
     });
   }
 
-  // ── Секция: Проверенные ──
+  // ── Секция: Проверенные (свёрнута по умолчанию) ──
   if(checked.length){
-    const hdr=document.createElement('div');hdr.className='gj-section-hdr';
-    hdr.innerHTML=`<span class="gj-dot gj-dot-chk"></span>Проверено <span class="gj-count">${checked.length}</span>`;
-    list.appendChild(hdr);
+    const {wrapper:cw, body:cb}=makeCollapsibleSection('gj-dot-chk','Проверено',checked.length,false);
+    list.appendChild(cw);
     const byStudent={};
     checked.forEach(a=>{const n=a.studentName||a.studentEmail;(byStudent[n]=byStudent[n]||[]).push(a);});
     Object.entries(byStudent).forEach(([name,entries],si)=>{
@@ -1455,8 +1557,8 @@ async function loadGrades(){
           ${g?gradeChip(g):'<span class="muted">—</span>'}`;
         sec.appendChild(row);
       });
-      list.appendChild(sec);
-      sec.animate([{opacity:'0',transform:'translateY(10px)'},{opacity:'1',transform:'none'}],
+      cb.appendChild(sec);
+      animOnce(sec,[{opacity:'0',transform:'translateY(10px)'},{opacity:'1',transform:'none'}],
         {duration:260,delay:si*60,easing:'ease',fill:'both'});
     });
   }
@@ -1474,22 +1576,20 @@ async function loadMyGrades(){
   if(!checked.length&&!pending.length){list.innerHTML='<p class="empty">Ответов нет</p>';return;}
 
   if(pending.length){
-    const hdr=document.createElement('div');hdr.className='gj-section-hdr';
-    hdr.innerHTML=`<span class="gj-dot gj-dot-pend"></span>Ожидают проверки <span class="gj-count">${pending.length}</span>`;
-    list.appendChild(hdr);
+    const {wrapper:pw,body:pb}=makeCollapsibleSection('gj-dot-pend','Ожидают проверки',pending.length,true);
+    list.appendChild(pw);
     pending.forEach((a,i)=>{
       const card=document.createElement('div');card.className='card';
       card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
         <p class="muted">${fmt(a.createdAt)}</p></div>
         <span class="sbadge spend">⏳ На проверке</span>`;
-      animCard(list, card, i*0.05);
+      animCard(pb, card, i*0.05);
     });
   }
 
   if(checked.length){
-    const hdr=document.createElement('div');hdr.className='gj-section-hdr';
-    hdr.innerHTML=`<span class="gj-dot gj-dot-chk"></span>Проверено <span class="gj-count">${checked.length}</span>`;
-    list.appendChild(hdr);
+    const {wrapper:cw,body:cb}=makeCollapsibleSection('gj-dot-chk','Проверено',checked.length,false);
+    list.appendChild(cw);
     checked.forEach((a,i)=>{
       const g=GRADES.find(x=>x.id===a.gradeId);
       const card=document.createElement('div');card.className='card';
@@ -1497,7 +1597,7 @@ async function loadMyGrades(){
         <p class="muted">${fmt(a.checkedAt)}</p>
         ${a.feedback?`<p class="gfb">💬 ${esc(a.feedback)}</p>`:''}</div>
         ${g?gradeChip(g,true):''}`;
-      animCard(list, card, i*0.05);
+      animCard(cb, card, i*0.05);
     });
   }
 }
@@ -1584,14 +1684,14 @@ async function openTopicView(topic){
       fbDiv.innerHTML=`<h4>✅ Ответ проверен ${gh}</h4>
         <p>${prev.feedback?esc(prev.feedback):'Комментарий не добавлен'}</p>`;
       st.appendChild(fbDiv);
-      // Раздел ответов студента
-      st.appendChild(await buildStudentAnswersSection(topic.id));
+      // Раздел комментариев
+      st.appendChild(await buildCommentsSection(topic.id));
     } else if(prev?.status==='pending'){
       const w=document.createElement('div');w.className='fbwait';
       w.textContent='⏳ Ответ отправлен на проверку';
       st.appendChild(w);
-      // Студент может отправить дополнительные ответы
-      st.appendChild(await buildStudentAnswersSection(topic.id));
+      // Студент может оставить комментарий и пока ждёт
+      st.appendChild(await buildCommentsSection(topic.id));
     } else {
       const btn=document.createElement('button');btn.className='btn bsubmit';
       btn.textContent='Отправить ответы на проверку';
@@ -1602,84 +1702,84 @@ async function openTopicView(topic){
   show('screen-sv');
 }
 
-// ── Система ответов студента к теме ───────────────────────────────────
-async function buildStudentAnswersSection(topicId){
+// ── Система комментариев к теме ────────────────────────────────
+async function buildCommentsSection(topicId){
   const wrap=document.createElement('div');wrap.className='comments-wrap';
-  wrap.innerHTML='<h3 class="comments-title">� Мои ответы</h3>';
+  wrap.innerHTML='<h3 class="comments-title">💬 Обсуждение</h3>';
 
-  // Загружаем только ответы текущего студента
+  // Загружаем комментарии — без orderBy чтобы не требовался составной индекс
   const snap=await getDocs(query(
-    collection(db,'answers'),
+    collection(db,'comments'),
     where('topicId','==',topicId),
-    where('studentId','==',CU.uid)
+    where('courseId','==',CID)
   ));
 
   const list=document.createElement('div');list.className='comments-list';
   // Сортировка на клиенте по времени создания
-  const answerDocs=[...snap.docs].sort((a,b)=>{
+  const commentDocs=[...snap.docs].sort((a,b)=>{
     const ta=a.data().createdAt?.toMillis?.()??0;
     const tb=b.data().createdAt?.toMillis?.()??0;
     return ta-tb;
   });
-  if(!answerDocs.length){
-    list.innerHTML='<p class="empty" style="padding:.75rem 0">У тебя пока нет ответов на эту тему</p>';
+  if(!commentDocs.length){
+    list.innerHTML='<p class="empty" style="padding:.75rem 0">Комментариев нет — будь первым!</p>';
   } else {
-    answerDocs.forEach(d=>{
-      const a=d.data();
+    commentDocs.forEach(d=>{
+      const c=d.data();
+      const isMe = c.authorId===CU.uid;
       const bubble=document.createElement('div');
-      bubble.className='comment-bubble comment-me';
-      
-      let statusText = '';
-      if (a.status === 'pending') statusText = '⏳ На проверке';
-      else if (a.status === 'checked') {
-        const g = GRADES.find(x=>x.id===a.gradeId);
-        statusText = `✅ Проверено ${g?g.label:''}`;
-      }
-      
+      bubble.className='comment-bubble '+(isMe?'comment-me':'comment-other');
       bubble.innerHTML=`
-        <div class="comment-author">Ответ от ${fmt(a.createdAt)} ${statusText}</div>
-        <div class="comment-text">${a.answers.map(ans=>esc(ans)).join('<br/>')}</div>
-        ${a.feedback ? `<div class="comment-text" style="margin-top:0.5rem;color:var(--green)">💬 ${esc(a.feedback)}</div>` : ''}`;
+        <div class="comment-author">${esc(c.authorName||c.authorEmail)}${isMe?' (Вы)':''}</div>
+        <div class="comment-text">${esc(c.text).replace(/\n/g,'<br/>')}</div>
+        <div class="comment-time">${fmt(c.createdAt)}</div>`;
       list.appendChild(bubble);
     });
   }
   wrap.appendChild(list);
 
-  // Форма отправки нового ответа
+  // Форма отправки нового комментария
   const form=document.createElement('div');form.className='comment-form';
-  form.innerHTML=`<textarea class="comment-ta" placeholder="Добавить новый ответ..." style="min-height:100px"></textarea>
-    <button class="btn bp btn-sm comment-send">Отправить ответ</button>`;
+  form.innerHTML=`<textarea class="comment-ta" placeholder="Написать комментарий..."></textarea>
+    <button class="btn bp btn-sm comment-send">Отправить</button>`;
   form.querySelector('.comment-send').addEventListener('click',async()=>{
     const ta=form.querySelector('textarea');
     const text=ta.value.trim();
-    if(!text){toast('Введи текст ответа','err');return;}
+    if(!text){toast('Введи текст комментария','err');return;}
     const sendBtn=form.querySelector('.comment-send');
     sendBtn.disabled=true;sendBtn.textContent='...';
     try{
-      // Получаем вопросы темы для сохранения
-      const topicSnap = await getDoc(doc(db,'courses',CID,'topics',topicId));
-      const topic = topicSnap.data();
-      const questions = (topic.blocks||[]).filter(b=>b.type==='question').map(b=>b.question);
-      
-      await addDoc(collection(db,'answers'),{
-        studentId:CU.uid,studentEmail:CU.email,studentName:UP.name||CU.email,
-        courseId:CID,topicId,topicTitle:topic.title,
-        questions,
-        answers: [text], // Ответ как массив для совместимости
-        status:'pending',gradeId:'',gradeLabel:'',feedback:'',createdAt:serverTimestamp()
+      const ref=await addDoc(collection(db,'comments'),{
+        topicId, courseId:CID,
+        authorId:CU.uid, authorEmail:CU.email,
+        authorName:UP.name||CU.email,
+        role:UP.role, text,
+        createdAt:serverTimestamp()
       });
       ta.value='';
-      toast('Ответ отправлен ✓','ok');
-      // Перезагружаем секцию ответов
-      const newSection = await buildStudentAnswersSection(topicId);
-      wrap.replaceWith(newSection);
+      toast('Комментарий отправлен','ok');
+      // Добавляем пузырёк прямо в список без перезагрузки всего раздела
+      // Убираем заглушку "комментариев нет" если есть
+      const emptyEl=list.querySelector('.empty');if(emptyEl)emptyEl.remove();
+      const bubble=document.createElement('div');
+      bubble.className='comment-bubble comment-me';
+      const now=new Date();
+      const fmtNow=now.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+      bubble.innerHTML=`
+        <div class="comment-author">${esc(UP.name||CU.email)} (Вы)</div>
+        <div class="comment-text">${esc(text).replace(/\n/g,'<br/>')}</div>
+        <div class="comment-time">${fmtNow}</div>`;
+      list.appendChild(bubble);
+      animOnce(bubble,
+        [{opacity:'0',transform:'translateY(8px)'},{opacity:'1',transform:'none'}],
+        {duration:220,easing:'ease',fill:'both'}
+      );
     }catch(e){toast('Ошибка: '+e.message,'err');}
-    finally{sendBtn.disabled=false;sendBtn.textContent='Отправить ответ';}
+    finally{sendBtn.disabled=false;sendBtn.textContent='Отправить';}
   });
   wrap.appendChild(form);
   return wrap;
 }
-
 function buildEmbed(raw){
   const wrap=document.createElement('div');
   const u=raw.trim();if(!u){wrap.classList.add('hidden');return wrap;}

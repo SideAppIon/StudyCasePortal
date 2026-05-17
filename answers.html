@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Ответы студентов — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph"><h1>Ответы студентов</h1></div>
+  <div class="swrap"><input type="text" id="asearch" placeholder="Поиск по имени или теме..."/></div>
+  <div id="list-ta"></div>
+</div>
+
+<script type="module">
+import { db, $, esc, fmt, toast, animCard, requireAuth,
+  collection, doc, getDocs, updateDoc, query, orderBy, serverTimestamp }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role==='student'){ window.location.href='index.html'; }
+insertNav('answers');
+
+let GRADES=[];
+const gSnap=await getDocs(collection(db,'grades'));
+gSnap.forEach(d=>GRADES.push({id:d.id,...d.data()}));
+GRADES.sort((a,b)=>(a.order||0)-(b.order||0));
+
+function gradeChip(g){
+  if(!g) return '';
+  const color=g.color||'#64748B';
+  return `<span class="grade-chip" style="background:${color}22;color:${color};border-color:${color}44">
+    <span class="grade-circle" style="background:${color}"></span>${esc(g.label)}</span>`;
+}
+
+async function loadAnswers(){
+  const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
+  const list=$('list-ta'); list.innerHTML='';
+  if(snap.empty){ list.innerHTML='<p class="empty">Ответов нет</p>'; return; }
+
+  snap.docs.forEach((d,i)=>{
+    const a=d.data();
+    const sc=a.status==='checked'?'schk':'spend';
+    const sl=a.status==='checked'?'✅ Проверено':'⏳ На проверке';
+    const savedGrade=GRADES.find(g=>g.id===a.gradeId);
+    const gradeOpts=GRADES.map(g=>`<option value="${g.id}" ${a.gradeId===g.id?'selected':''}>${esc(g.label)}</option>`).join('');
+
+    const card=document.createElement('div'); card.className='card acard';
+    card.innerHTML=`
+      <div class="ahdr">
+        <div>
+          <strong>${esc(a.studentName||a.studentEmail)}</strong>
+          ${a.studentGroupName?`<span class="grptag">${esc(a.studentGroupName)}</span>`:''}
+          <span class="muted"> · ${esc(a.topicTitle||'')} · ${fmt(a.createdAt)}</span>
+          ${savedGrade?gradeChip(savedGrade):''}
+        </div>
+        <span class="sbadge ${sc}">${sl}</span>
+      </div>
+      <div>${(a.answers||[]).map((ans,j)=>`
+        <div class="qablock">
+          <p class="qt">Вопрос ${j+1}: ${esc((a.questions||[])[j]||'')}</p>
+          <p class="at">${esc(ans)}</p>
+        </div>`).join('')}
+      </div>
+      <div class="fbrow">
+        <div class="fbl">
+          <label class="slbl">Оценка</label>
+          <select id="gs${d.id}"><option value="">— без оценки —</option>${gradeOpts}</select>
+        </div>
+        <div class="fbr">
+          <label class="slbl">Комментарий</label>
+          <textarea class="fbinp" id="fb${d.id}" placeholder="Комментарий...">${esc(a.feedback||'')}</textarea>
+        </div>
+        <button class="btn bp fbbtn" data-aid="${d.id}">Сохранить</button>
+      </div>`;
+    animCard(list,card,i*0.04);
+  });
+}
+await loadAnswers();
+
+$('list-ta').addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-aid]'); if(!btn) return;
+  const id=btn.dataset.aid;
+  const gradeId=$('gs'+id).value;
+  const gradeLabel=GRADES.find(g=>g.id===gradeId)?.label||'';
+  const feedback=$('fb'+id).value;
+  await updateDoc(doc(db,'answers',id),{feedback,gradeId,gradeLabel,status:'checked',checkedAt:serverTimestamp(),checkedBy:user.uid});
+  toast('Сохранено ✓','ok'); btn.textContent='✓';
+  setTimeout(()=>{ btn.textContent='Сохранить'; },1500);
+  loadAnswers();
+});
+
+$('asearch').addEventListener('input',function(){
+  const q=this.value.toLowerCase();
+  document.querySelectorAll('.acard').forEach(c=>{
+    c.style.display=c.textContent.toLowerCase().includes(q)?'':'none';
+  });
+});
+</script>
+</body>
+</html>

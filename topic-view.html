@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Тема — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph">
+    <a href="topics-student.html" class="bbk">← К темам</a>
+    <h1 id="lbl-topic"></h1>
+  </div>
+  <div id="topic-content"></div>
+  <div id="topic-status"></div>
+</div>
+
+<script type="module">
+import { db, auth, $, esc, fmt, toast, animOnce, buildEmbed, requireAuth, State,
+  collection, doc, getDocs, getDoc, addDoc, query, where, serverTimestamp }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role !== 'student'){ window.location.href='index.html'; }
+insertNav('my-courses');
+
+const CID         = State.get('CID');
+const courseTitle = State.get('courseTitle')||'';
+const topic       = State.get('TOPIC');
+if(!CID||!topic){ window.location.href='my-courses.html'; }
+
+$('lbl-topic').textContent = topic.title;
+
+// Load previous text answers
+const prevSnap=await getDocs(query(collection(db,'answers'),
+  where('topicId','==',topic.id), where('studentId','==',user.uid)));
+let prev=null; prevSnap.forEach(d=>{ prev=d.data(); });
+
+// Load quiz attempts
+const quizBlocks=(topic.blocks||[]).filter(b=>b.type==='quiz');
+const quizAttempts={};
+if(quizBlocks.length){
+  const attSnap=await getDocs(query(collection(db,'quiz_attempts'),
+    where('studentId','==',user.uid), where('topicId','==',topic.id)));
+  attSnap.forEach(d=>{
+    const a=d.data();
+    (quizAttempts[a.quizIdx]=quizAttempts[a.quizIdx]||[]).push(a);
+  });
+}
+
+const cont=$('topic-content');
+const qblocks=[];
+let quizIdx=0;
+
+(topic.blocks||[]).forEach(block=>{
+  const el=document.createElement('div'); el.className='tblock';
+
+  if(block.type==='text'){
+    el.innerHTML=`<div class="ttext">${(block.content||'').replace(/\n/g,'<br/>')}</div>`;
+
+  } else if(block.type==='image'){
+    const u=(block.url||'').trim();
+    if(u) el.innerHTML=`<img class="timg" src="${esc(u)}" alt="Изображение"
+      onerror="this.outerHTML='<div class=imgerr>⚠ Изображение не загружается.</div>'"/>`;
+
+  } else if(block.type==='video'){
+    el.appendChild(buildEmbed(block.url||''));
+
+  } else if(block.type==='question'){
+    const qi=qblocks.length; qblocks.push(block);
+    if(prev){
+      el.innerHTML=`<div class="qblock"><p class="qlbl">❓ ${esc(block.question)}</p>
+        <div class="pans">${esc((prev.answers||[])[qi]||'—')}</div></div>`;
+    } else {
+      el.innerHTML=`<div class="qblock"><p class="qlbl">❓ ${esc(block.question)}</p>
+        <textarea class="ata" data-qi="${qi}" placeholder="Твой ответ..."></textarea></div>`;
+    }
+
+  } else if(block.type==='quiz'){
+    const qi2=quizIdx++;
+    el.appendChild(buildQuizViewer(block, qi2, quizAttempts[qi2]||[]));
+  }
+
+  cont.appendChild(el);
+});
+
+// ── Status / submit for text questions ───────────────────────
+const st=$('topic-status');
+if(qblocks.length){
+  if(prev?.status==='checked'){
+    let GRADES=[];
+    const gs=await getDocs(collection(db,'grades'));
+    gs.forEach(d=>GRADES.push({id:d.id,...d.data()}));
+    const g=GRADES.find(x=>x.id===prev.gradeId);
+    const color=g?.color||'#64748B';
+    const chip=g?`<span class="grade-chip gsize-big" style="background:${color}22;color:${color};border-color:${color}44">
+      <span class="grade-circle" style="background:${color}"></span>${esc(g.label)}</span>`:'';
+    const d=document.createElement('div'); d.className='fbok';
+    d.innerHTML=`<h4>✅ Ответ проверен ${chip}</h4>
+      <p>${prev.feedback?esc(prev.feedback):'Комментарий не добавлен'}</p>`;
+    st.appendChild(d);
+    st.appendChild(await buildComments());
+
+  } else if(prev?.status==='pending'){
+    const w=document.createElement('div'); w.className='fbwait';
+    w.textContent='⏳ Ответ отправлен на проверку';
+    st.appendChild(w);
+    st.appendChild(await buildComments());
+
+  } else {
+    const btn=document.createElement('button'); btn.className='btn bsubmit';
+    btn.textContent='Отправить ответы на проверку';
+    btn.addEventListener('click',()=>submitAnswers(qblocks));
+    st.appendChild(btn);
+  }
+} else if(!quizBlocks.length){
+  st.appendChild(await buildComments());
+}
+
+// ── Quiz viewer ───────────────────────────────────────────────
+function buildQuizViewer(block, qi, attList){
+  const qs=block.questions||[];
+  const totalPts=qs.reduce((s,q)=>s+(q.points||1),0);
+  const maxAttempts=block.maxAttempts||0;
+  const usedAttempts=attList.length;
+  const canAttempt=!maxAttempts||usedAttempts<maxAttempts;
+  const lastAtt=attList[attList.length-1]||null;
+  const passed=lastAtt?.passed;
+
+  const container=document.createElement('div'); container.className='quiz-container';
+  const attText=maxAttempts?`${usedAttempts}/${maxAttempts} попыток`:(usedAttempts?`${usedAttempts} попыток`:'');
+
+  container.innerHTML=`
+    <div class="quiz-title">🎯 ${esc(block.quizTitle||'Тест')}</div>
+    <div class="quiz-meta">
+      <span>📊 ${totalPts} балл(ов)</span>
+      <span>✅ Порог: ${block.passingScore||60}%</span>
+      ${attText?`<span>🔄 ${attText}</span>`:''}
+    </div>`;
+
+  if(lastAtt){
+    const box=document.createElement('div');
+    box.className=`quiz-score-box ${lastAtt.passed?'quiz-score-pass':'quiz-score-fail'}`;
+    box.innerHTML=`<div class="quiz-score-num">${lastAtt.score}%</div>
+      <div class="quiz-score-label">${lastAtt.passed?'✅ Тест пройден!':'❌ Не пройден'} · ${lastAtt.earnedPoints}/${totalPts} баллов</div>`;
+    container.appendChild(box);
+
+    // Review answers
+    if(lastAtt.answers && qs.length){
+      const rev=document.createElement('div'); rev.style.marginTop='.85rem';
+      qs.forEach((q,i)=>{
+        const qDiv=document.createElement('div'); qDiv.className='quiz-question';
+        const userAns=lastAtt.answers[i];
+        let ansHtml='';
+        if(q.type==='choice'){
+          ansHtml='<div class="quiz-options">'+(q.options||[]).map((o,oi)=>{
+            let cls='quiz-option';
+            if(oi===q.correctIndex) cls+=' correct';
+            else if(oi===userAns)   cls+=' wrong';
+            return `<div class="${cls}">${esc(o)}</div>`;
+          }).join('')+'</div>';
+        } else {
+          ansHtml=`<div class="pans" style="margin-top:.4rem">${esc(userAns||'—')}</div>`;
+        }
+        qDiv.innerHTML=`<div class="quiz-q-text">${i+1}. ${esc(q.text)}<span class="quiz-q-points">${q.points||1} б.</span></div>${ansHtml}`;
+        rev.appendChild(qDiv);
+      });
+      container.appendChild(rev);
+    }
+  }
+
+  function buildForm(){
+    const form=document.createElement('div'); form.style.marginTop='1rem';
+    qs.forEach((q,i)=>{
+      const qDiv=document.createElement('div'); qDiv.className='quiz-question';
+      let inputHtml='';
+      if(q.type==='choice'){
+        inputHtml='<div class="quiz-options">'+(q.options||[]).map((o,oi)=>
+          `<label class="quiz-option" data-oi="${oi}">
+            <input type="radio" name="qz${qi}_${i}" value="${oi}"/> ${esc(o)}</label>`
+        ).join('')+'</div>';
+      } else {
+        inputHtml=`<textarea class="quiz-open-answer" data-qi="${i}" placeholder="Твой ответ..."></textarea>`;
+      }
+      qDiv.innerHTML=`<div class="quiz-q-text">${i+1}. ${esc(q.text)}<span class="quiz-q-points">${q.points||1} б.</span></div>${inputHtml}`;
+      qDiv.addEventListener('click',e=>{
+        const lbl=e.target.closest('.quiz-option'); if(!lbl) return;
+        qDiv.querySelectorAll('.quiz-option').forEach(l=>l.classList.remove('selected'));
+        lbl.classList.add('selected');
+      });
+      form.appendChild(qDiv);
+    });
+
+    const submitBtn=document.createElement('button'); submitBtn.className='btn bsubmit';
+    submitBtn.textContent='Отправить тест';
+    submitBtn.addEventListener('click',async()=>{
+      const answers=[]; let valid=true;
+      qs.forEach((q,i)=>{
+        if(q.type==='choice'){
+          const sel=form.querySelector(`input[name="qz${qi}_${i}"]:checked`);
+          if(!sel){ valid=false; return; }
+          answers.push(parseInt(sel.value));
+        } else {
+          const ta=form.querySelector(`textarea[data-qi="${i}"]`);
+          const v=ta?ta.value.trim():'';
+          if(!v) valid=false;
+          answers.push(v);
+        }
+      });
+      if(!valid){ toast('Ответь на все вопросы','err'); return; }
+
+      let earned=0;
+      qs.forEach((q,i)=>{
+        if(q.type==='choice' && answers[i]===q.correctIndex) earned+=(q.points||1);
+        else if(q.type==='open') earned+=(q.points||1); // открытые засчитываются автоматически
+      });
+      const score=totalPts?Math.round(earned/totalPts*100):0;
+      const passed2=score>=(block.passingScore||60);
+
+      submitBtn.disabled=true; submitBtn.textContent='Отправляю...';
+      try{
+        await addDoc(collection(db,'quiz_attempts'),{
+          studentId:user.uid, studentName:UP.name||user.email,
+          courseId:CID, topicId:topic.id, topicTitle:topic.title,
+          quizIdx:qi, quizTitle:block.quizTitle||'Тест',
+          answers, score, passed:passed2, earnedPoints:earned, totalPoints:totalPts,
+          attemptNum:usedAttempts+1, createdAt:serverTimestamp()
+        });
+        if(passed2) await grantAchievement(block.quizTitle||'Тест', score);
+        toast(passed2?`✅ Тест пройден! ${score}%`:`❌ ${score}% — попробуй ещё`, passed2?'ok':'err');
+        // Refresh page to show results
+        State.set('TOPIC', topic);
+        window.location.reload();
+      }catch(e){ toast('Ошибка: '+e.message,'err'); submitBtn.disabled=false; submitBtn.textContent='Отправить тест'; }
+    });
+    form.appendChild(submitBtn);
+    return form;
+  }
+
+  if(canAttempt && !passed){
+    if(!lastAtt){
+      container.appendChild(buildForm());
+    } else {
+      const retryBtn=document.createElement('button'); retryBtn.className='btn bs';
+      retryBtn.style.marginTop='.75rem';
+      const left=maxAttempts?maxAttempts-usedAttempts:'∞';
+      retryBtn.textContent=`🔄 Попробовать ещё раз (осталось: ${left})`;
+      retryBtn.addEventListener('click',()=>{ container.removeChild(retryBtn); container.appendChild(buildForm()); });
+      container.appendChild(retryBtn);
+    }
+  } else if(!canAttempt && !passed){
+    const no=document.createElement('div'); no.className='fbwait'; no.textContent='⛔ Попытки исчерпаны';
+    container.appendChild(no);
+  }
+
+  if(passed){
+    const ach=document.createElement('div');
+    ach.style.cssText='margin-top:.6rem;background:#FFFBEB;border:1px solid #FDE68A;border-radius:var(--rd);padding:.75rem 1rem;display:flex;align-items:center;gap:.65rem;';
+    ach.innerHTML=`<span style="font-size:1.5rem">⭐</span>
+      <div><strong>Достижение получено!</strong><br/><span class="muted">${esc(topic.title)} — ${esc(courseTitle)}</span></div>`;
+    container.appendChild(ach);
+  }
+
+  const wrap=document.createElement('div'); wrap.className='tblock';
+  wrap.appendChild(container); return wrap;
+}
+
+async function grantAchievement(quizTitle, score){
+  const snap=await getDocs(query(collection(db,'achievements'),
+    where('studentId','==',user.uid), where('topicId','==',topic.id), where('courseId','==',CID)));
+  if(!snap.empty) return;
+  await addDoc(collection(db,'achievements'),{
+    studentId:user.uid, studentName:UP.name||user.email,
+    topicId:topic.id, topicTitle:topic.title,
+    courseId:CID, courseTitle,
+    quizTitle, score, earnedAt:serverTimestamp()
+  });
+  showAchNotify();
+}
+
+function showAchNotify(){
+  const n=document.getElementById('ach-notify');
+  if(!n) return;
+  n.innerHTML=`⭐ Достижение получено!<br/><small style="font-weight:400;opacity:.9">${esc(topic.title)} — ${esc(courseTitle)}</small>`;
+  n.classList.remove('hidden');
+  animOnce(n,
+    [{opacity:'0',transform:'translateX(-50%) translateY(-12px)'},{opacity:'1',transform:'translateX(-50%) translateY(0)'}],
+    {duration:350,easing:'cubic-bezier(.34,1.56,.64,1)',fill:'both'}
+  );
+  setTimeout(()=>{
+    animOnce(n,[{opacity:'1'},{opacity:'0'}],{duration:250,fill:'both'});
+    setTimeout(()=>n.classList.add('hidden'),250);
+  },3500);
+}
+
+// ── Submit text answers ───────────────────────────────────────
+async function submitAnswers(qblocks){
+  const tas=document.querySelectorAll('#topic-content textarea.ata');
+  const answers=[...tas].map(t=>t.value.trim());
+  if(answers.some(a=>!a)){ toast('Ответь на все вопросы','err'); return; }
+  await addDoc(collection(db,'answers'),{
+    studentId:user.uid, studentEmail:user.email, studentName:UP.name||user.email,
+    studentGroupId:UP.groupId||'', studentGroupName:UP.groupName||'',
+    courseId:CID, topicId:topic.id, topicTitle:topic.title,
+    questions:qblocks.map(b=>b.question), answers,
+    status:'pending', gradeId:'', gradeLabel:'', feedback:'',
+    createdAt:serverTimestamp()
+  });
+  toast('Ответы отправлены ✓','ok');
+  State.set('TOPIC',topic);
+  window.location.reload();
+}
+
+// ── Comments ──────────────────────────────────────────────────
+async function buildComments(){
+  const wrap=document.createElement('div'); wrap.className='comments-wrap';
+  wrap.innerHTML='<h3 class="comments-title">💬 Обсуждение</h3>';
+
+  const snap=await getDocs(query(collection(db,'comments'),
+    where('topicId','==',topic.id), where('courseId','==',CID)));
+  const list=document.createElement('div'); list.className='comments-list';
+  const sorted=[...snap.docs].sort((a,b)=>(a.data().createdAt?.toMillis?.()??0)-(b.data().createdAt?.toMillis?.()??0));
+
+  if(!sorted.length) list.innerHTML='<p class="empty" style="padding:.6rem 0">Комментариев нет — будь первым!</p>';
+  else sorted.forEach(d=>{
+    const c=d.data(); const isMe=c.authorId===user.uid;
+    const bubble=document.createElement('div');
+    bubble.className='comment-bubble '+(isMe?'comment-me':'comment-other');
+    bubble.innerHTML=`<div class="comment-author">${esc(c.authorName||c.authorEmail)}${isMe?' (Вы)':''}</div>
+      <div class="comment-text">${esc(c.text).replace(/\n/g,'<br/>')}</div>
+      <div class="comment-time">${fmt(c.createdAt)}</div>`;
+    list.appendChild(bubble);
+  });
+  wrap.appendChild(list);
+
+  const form=document.createElement('div'); form.className='comment-form';
+  form.innerHTML=`<textarea class="comment-ta" placeholder="Написать комментарий..."></textarea>
+    <button class="btn bp btn-sm">Отправить</button>`;
+  form.querySelector('button').addEventListener('click',async()=>{
+    const ta=form.querySelector('textarea'); const text=ta.value.trim();
+    if(!text){ toast('Введи текст','err'); return; }
+    const btn=form.querySelector('button'); btn.disabled=true; btn.textContent='...';
+    try{
+      await addDoc(collection(db,'comments'),{
+        topicId:topic.id, courseId:CID,
+        authorId:user.uid, authorEmail:user.email, authorName:UP.name||user.email,
+        role:UP.role, text, createdAt:serverTimestamp()
+      });
+      ta.value=''; toast('Отправлено','ok');
+      const empty=list.querySelector('.empty'); if(empty) empty.remove();
+      const bubble=document.createElement('div'); bubble.className='comment-bubble comment-me';
+      const now=new Date();
+      const ts=now.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})+' '+now.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+      bubble.innerHTML=`<div class="comment-author">${esc(UP.name||user.email)} (Вы)</div>
+        <div class="comment-text">${esc(text).replace(/\n/g,'<br/>')}</div>
+        <div class="comment-time">${ts}</div>`;
+      list.appendChild(bubble);
+      animOnce(bubble,[{opacity:'0',transform:'translateY(6px)'},{opacity:'1',transform:'none'}],{duration:200,easing:'ease',fill:'both'});
+    }catch(e){ toast('Ошибка: '+e.message,'err'); }
+    finally{ btn.disabled=false; btn.textContent='Отправить'; }
+  });
+  wrap.appendChild(form);
+  return wrap;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Настройки — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph"><h1>Настройки</h1></div>
+
+  <div class="settings-block">
+    <h2 class="settings-h2">🏅 Оценки</h2>
+    <p class="muted" style="margin-bottom:.85rem">Создавай оценки — преподаватели выбирают их при проверке ответов.</p>
+    <div class="grade-add-form">
+      <div class="fg"><label>Название оценки</label><input type="text" id="gr-name" placeholder="Отлично, Молодец..."/></div>
+      <div class="fg" style="min-width:200px"><label>Цвет</label><div class="color-swatches" id="gr-swatches"></div></div>
+      <button class="btn bp btn-sm" style="align-self:flex-end;margin-bottom:.26rem" id="gr-add">+ Добавить</button>
+    </div>
+    <div class="grade-list" id="grade-list"></div>
+  </div>
+
+  <div class="settings-block">
+    <h2 class="settings-h2">🖼 Логотип</h2>
+    <p class="muted" style="margin-bottom:.65rem">Положи файл <code>logo.png</code> рядом с <code>index.html</code>.</p>
+    <label class="toggle-row"><input type="checkbox" id="tog-logo-nav" checked/><span>Показывать в шапке</span></label>
+    <label class="toggle-row" style="margin-top:.35rem"><input type="checkbox" id="tog-logo-login" checked/><span>Показывать на странице входа</span></label>
+    <button class="btn bp btn-sm" style="margin-top:.8rem" id="btn-save-logo">Сохранить</button>
+  </div>
+
+  <div class="settings-block">
+    <h2 class="settings-h2">🔗 Социальные сети и футер</h2>
+    <div class="fg"><label>ВКонтакте</label><input type="url" id="set-vk" placeholder="https://vk.com/yourgroup"/></div>
+    <div class="fg"><label>Telegram</label><input type="url" id="set-tg" placeholder="https://t.me/yourchannel"/></div>
+    <div class="fg"><label>Дополнительная ссылка</label><input type="url" id="set-link" placeholder="https://yoursite.ru"/></div>
+    <div class="fg"><label>Подпись к ссылке</label><input type="text" id="set-link-label" placeholder="Наш сайт"/></div>
+    <button class="btn bp btn-sm" id="btn-save-footer">Сохранить</button>
+  </div>
+
+  <div class="settings-block" style="background:#FFFBEB;border-color:#FDE68A;">
+    <h2 class="settings-h2">⚠️ Правила Firestore</h2>
+    <p class="muted" style="margin-bottom:.6rem;font-size:.82rem">Firebase → Firestore → Rules — замени целиком содержимым файла <code>firestore.rules</code> из архива.</p>
+  </div>
+</div>
+
+<script type="module">
+import { db, $, esc, toast, requireAuth, SITE_SETTINGS, loadSiteSettings, applyLogoVisibility,
+  collection, doc, getDocs, addDoc, deleteDoc, setDoc, serverTimestamp }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role !== 'admin'){ window.location.href='index.html'; }
+insertNav('settings');
+
+await loadSiteSettings();
+
+// ── Grades ────────────────────────────────────────────────────
+let GRADES=[], CHOSEN_COLOR='#22C55E';
+const SWATCHES=['#22C55E','#3B82F6','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4','#64748B','#F97316','#14B8A6'];
+
+async function loadGrades(){
+  const snap=await getDocs(collection(db,'grades'));
+  GRADES=[]; snap.forEach(d=>GRADES.push({id:d.id,...d.data()}));
+  GRADES.sort((a,b)=>(a.order||0)-(b.order||0));
+  renderGrades();
+}
+
+function renderSwatches(){
+  const sw=$('gr-swatches'); sw.innerHTML='';
+  SWATCHES.forEach(c=>{
+    const s=document.createElement('div'); s.className='swatch'+(c===CHOSEN_COLOR?' active':'');
+    s.style.background=c; s.dataset.color=c; sw.appendChild(s);
+  });
+  sw.addEventListener('click',e=>{
+    const s=e.target.closest('.swatch'); if(!s) return;
+    CHOSEN_COLOR=s.dataset.color;
+    sw.querySelectorAll('.swatch').forEach(x=>x.classList.toggle('active',x.dataset.color===CHOSEN_COLOR));
+  });
+}
+
+function renderGrades(){
+  const list=$('grade-list'); list.innerHTML='';
+  if(!GRADES.length){ list.innerHTML='<p class="empty">Оценок нет</p>'; return; }
+  GRADES.forEach((g,i)=>{
+    const item=document.createElement('div'); item.className='grade-item';
+    item.innerHTML=`<div class="gi-color" style="background:${g.color||'#64748B'}"></div>
+      <span class="gi-label">${esc(g.label)}</span>
+      <button class="btn bg btn-sm" data-id="${g.id}">Удалить</button>`;
+    item.querySelector('button').addEventListener('click',async()=>{
+      if(!confirm('Удалить оценку?')) return;
+      await deleteDoc(doc(db,'grades',g.id)); toast('Удалено'); loadGrades();
+    });
+    list.appendChild(item);
+    item.animate([{opacity:'0',transform:'translateX(-8px)'},{opacity:'1',transform:'none'}],{duration:200,delay:i*40,easing:'ease',fill:'both'});
+  });
+}
+
+$('gr-add').onclick=async()=>{
+  const label=$('gr-name').value.trim(); if(!label){ toast('Введи название','err'); return; }
+  await addDoc(collection(db,'grades'),{label,color:CHOSEN_COLOR,order:GRADES.length,createdAt:serverTimestamp()});
+  $('gr-name').value=''; toast('Оценка добавлена','ok'); loadGrades();
+};
+
+renderSwatches();
+await loadGrades();
+
+// ── Logo settings ─────────────────────────────────────────────
+$('tog-logo-nav').checked   = SITE_SETTINGS.logoNav   !== false;
+$('tog-logo-login').checked = SITE_SETTINGS.logoLogin !== false;
+
+$('btn-save-logo').onclick=async()=>{
+  SITE_SETTINGS.logoNav   = $('tog-logo-nav').checked;
+  SITE_SETTINGS.logoLogin = $('tog-logo-login').checked;
+  await setDoc(doc(db,'settings','site'), SITE_SETTINGS, {merge:true});
+  applyLogoVisibility(); toast('Сохранено ✓','ok');
+};
+
+// ── Footer settings ───────────────────────────────────────────
+$('set-vk').value         = SITE_SETTINGS.vk||'';
+$('set-tg').value         = SITE_SETTINGS.tg||'';
+$('set-link').value       = SITE_SETTINGS.link||'';
+$('set-link-label').value = SITE_SETTINGS.linkLabel||'';
+
+$('btn-save-footer').onclick=async()=>{
+  SITE_SETTINGS.vk        = $('set-vk').value.trim();
+  SITE_SETTINGS.tg        = $('set-tg').value.trim();
+  SITE_SETTINGS.link      = $('set-link').value.trim();
+  SITE_SETTINGS.linkLabel = $('set-link-label').value.trim();
+  await setDoc(doc(db,'settings','site'), SITE_SETTINGS, {merge:true});
+  toast('Футер сохранён ✓','ok');
+};
+</script>
+</body>
+</html>

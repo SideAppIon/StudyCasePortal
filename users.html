@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Пользователи — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph"><h1>Пользователи</h1><button class="btn bp btn-sm" id="btnnu">+ Создать</button></div>
+  <div class="swrap"><input type="text" id="usearch" placeholder="Поиск по имени или email..."/></div>
+  <div class="group-tabs" id="user-group-tabs"></div>
+  <div id="list-au"></div>
+</div>
+
+<!-- Modal: create/edit user -->
+<div id="m-nu" class="mover hidden">
+  <div class="mbox">
+    <h2 id="nu-title">Новый пользователь</h2>
+    <div class="fg"><label>Имя</label><input type="text" id="nu-name" placeholder="Иванов Иван"/></div>
+    <div class="fg"><label>Email</label><input type="email" id="nu-email" placeholder="ivan@school.ru"/></div>
+    <div class="fg" id="nu-pwrap"><label>Пароль</label><input type="password" id="nu-pass" placeholder="мин. 6 символов"/></div>
+    <div class="fg"><label>Роль</label>
+      <select id="nu-role">
+        <option value="student">Студент</option>
+        <option value="teacher">Преподаватель</option>
+        <option value="admin">Администратор</option>
+      </select>
+    </div>
+    <div class="fg"><label>Группа <span style="font-weight:400;color:var(--mu)">(необязательно)</span></label>
+      <select id="nu-group"><option value="">— без группы —</option></select>
+    </div>
+    <div class="mactions">
+      <button class="btn bg" id="nu-cancel">Отмена</button>
+      <button class="btn bp" id="nu-save">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: reset password -->
+<div id="m-rp" class="mover hidden">
+  <div class="mbox">
+    <h2>Сброс пароля</h2>
+    <p class="muted" style="margin-bottom:.8rem">Пользователь: <strong id="rp-name"></strong></p>
+    <div class="fg"><label>Новый пароль</label><input type="password" id="rp-pass" placeholder="мин. 6 символов"/></div>
+    <p style="font-size:.78rem;color:var(--mu);margin-top:.2rem">Применится при следующем входе пользователя.</p>
+    <div class="mactions">
+      <button class="btn bg" id="rp-cancel">Отмена</button>
+      <button class="btn bw" id="rp-save">Сменить пароль</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { db, firebaseConfig, $, esc, toast, animCard, mshow, mhide, requireAuth,
+  collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query, where, serverTimestamp, State }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role !== 'admin'){ window.location.href='index.html'; }
+insertNav('users');
+
+let GROUPS=[], EUID=null, RUID=null;
+
+async function loadGroups(){
+  const snap=await getDocs(collection(db,'groups'));
+  GROUPS=[]; snap.forEach(d=>GROUPS.push({id:d.id,...d.data()}));
+  GROUPS.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+}
+await loadGroups();
+
+function fillGroupSelect(){
+  const sel=$('nu-group'), cur=sel.value;
+  sel.innerHTML='<option value="">— без группы —</option>';
+  GROUPS.forEach(g=>{
+    const o=document.createElement('option');o.value=g.id;o.textContent=g.name;
+    if(g.id===cur)o.selected=true; sel.appendChild(o);
+  });
+}
+
+// ── Users list with group filter tabs ─────────────────────────
+let ALL_USERS=[], activeGroup='', searchFilter='';
+
+async function loadUsers(){
+  const snap=await getDocs(collection(db,'users'));
+  ALL_USERS=[]; snap.forEach(d=>ALL_USERS.push({id:d.id,...d.data()}));
+  ALL_USERS.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+  buildGroupTabs();
+  renderUsers();
+}
+
+function buildGroupTabs(){
+  const tabs=$('user-group-tabs'); tabs.innerHTML='';
+  const mkTab=(label,val)=>{
+    const btn=document.createElement('button'); btn.className='gtab'+(activeGroup===val?' active':'');
+    btn.textContent=label;
+    btn.addEventListener('click',()=>{ activeGroup=val; tabs.querySelectorAll('.gtab').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); renderUsers(); });
+    tabs.appendChild(btn);
+  };
+  mkTab('Все',''​);
+  GROUPS.forEach(g=>mkTab(g.name, g.id));
+  mkTab('Без группы','__none__');
+}
+
+function renderUsers(){
+  const list=$('list-au'); list.innerHTML='';
+  const f=searchFilter.toLowerCase();
+  let shown=0;
+  ALL_USERS.forEach(u=>{
+    if(f && !((u.name||'').toLowerCase().includes(f)||(u.email||'').toLowerCase().includes(f))) return;
+    if(activeGroup==='__none__' && u.groupId) return;
+    if(activeGroup && activeGroup!=='__none__' && u.groupId!==activeGroup) return;
+    shown++;
+    const rl=u.role==='admin'?'Администратор':u.role==='teacher'?'Преподаватель':'Студент';
+    const grp=u.groupName?` <span class="grptag">${esc(u.groupName)}</span>`:'';
+    const init=(u.name||u.email||'?')[0].toUpperCase();
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`
+      <div class="member-avatar" style="width:36px;height:36px;font-size:.85rem;flex-shrink:0">${init}</div>
+      <div class="ci"><h3>${esc(u.name||'—')}</h3>
+        <p>${esc(u.email)} · <span class="rbadge r${u.role[0]}">${rl}</span>${grp}</p></div>
+      <div class="ca">
+        <button class="btn bs btn-sm" data-action="edit"    data-id="${u.id}">✏</button>
+        <button class="btn bw btn-sm" data-action="resetpw" data-id="${u.id}" data-name="${esc(u.name||u.email)}">🔑</button>
+        <button class="btn bg btn-sm" data-action="del"     data-id="${u.id}">✕</button>
+      </div>`;
+    animCard(list,card,shown*0.04);
+  });
+  if(!shown) list.innerHTML='<p class="empty">Нет пользователей</p>';
+}
+
+await loadUsers();
+$('usearch').oninput=function(){ searchFilter=this.value; renderUsers(); };
+
+$('list-au').addEventListener('click',async e=>{
+  const btn=e.target.closest('button[data-action]'); if(!btn) return;
+  const {action,id,name}=btn.dataset;
+  if(action==='edit')   { await openEdit(id); }
+  if(action==='resetpw'){ RUID=id; $('rp-name').textContent=name; $('rp-pass').value=''; mshow('m-rp'); }
+  if(action==='del'){
+    if(!confirm('Удалить пользователя из базы?')) return;
+    await deleteDoc(doc(db,'users',id)); toast('Удалён'); loadUsers();
+  }
+});
+
+async function openEdit(uid){
+  EUID=uid;
+  const snap=await getDoc(doc(db,'users',uid)); const u=snap.data();
+  $('nu-title').textContent='Редактировать пользователя';
+  $('nu-name').value=u.name||''; $('nu-email').value=u.email||'';
+  $('nu-role').value=u.role||'student';
+  fillGroupSelect(); $('nu-group').value=u.groupId||'';
+  $('nu-pwrap').classList.add('hidden');
+  mshow('m-nu');
+}
+
+$('btnnu').onclick=()=>{
+  EUID=null; $('nu-title').textContent='Новый пользователь';
+  $('nu-name').value=''; $('nu-email').value=''; $('nu-pass').value='';
+  $('nu-role').value='student'; fillGroupSelect(); $('nu-group').value='';
+  $('nu-pwrap').classList.remove('hidden');
+  mshow('m-nu');
+};
+$('nu-cancel').onclick=()=>{ mhide('m-nu'); EUID=null; $('nu-pwrap').classList.remove('hidden'); };
+$('nu-save').onclick=async()=>{
+  const name=$('nu-name').value.trim(), email=$('nu-email').value.trim(),
+        pass=$('nu-pass').value, role=$('nu-role').value,
+        groupId=$('nu-group').value,
+        groupName=GROUPS.find(g=>g.id===groupId)?.name||'';
+  if(EUID){
+    if(!name){ toast('Введи имя','err'); return; }
+    await updateDoc(doc(db,'users',EUID),{name,role,email,groupId,groupName});
+    toast('Сохранено ✓','ok'); mhide('m-nu'); EUID=null; $('nu-pwrap').classList.remove('hidden'); loadUsers(); return;
+  }
+  if(!name||!email||!pass){ toast('Заполни имя, email и пароль','err'); return; }
+  try{
+    const res=await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password:pass,returnSecureToken:false})
+    });
+    const data=await res.json();
+    if(data.error){ toast('Firebase: '+data.error.message,'err'); return; }
+    await setDoc(doc(db,'users',data.localId),{name,email,role,groupId,groupName,createdAt:serverTimestamp()});
+    toast('Пользователь создан ✓','ok'); mhide('m-nu'); loadUsers();
+  }catch(e){ toast('Ошибка: '+e.message,'err'); }
+};
+
+$('rp-cancel').onclick=()=>mhide('m-rp');
+$('rp-save').onclick=async()=>{
+  const p=$('rp-pass').value;
+  if(!p||p.length<6){ toast('Пароль минимум 6 символов','err'); return; }
+  const btn=$('rp-save'); btn.disabled=true; btn.textContent='Сохраняю...';
+  try{
+    await updateDoc(doc(db,'users',RUID),{pendingPassword:p});
+    toast('Пароль сохранён — применится при следующем входе ✓','ok'); mhide('m-rp');
+  }catch(e){ toast('Ошибка: '+e.message,'err'); }
+  finally{ btn.disabled=false; btn.textContent='Сохранить'; }
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Мои оценки — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph"><h1>Мои оценки</h1></div>
+  <div id="list-mg"></div>
+</div>
+
+<script type="module">
+import { db, $, esc, fmt, animCard, requireAuth, gradeChip, makeCollapsibleSection, animOnce,
+  collection, getDocs, query, where, orderBy }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role !== 'student'){ window.location.href='index.html'; }
+insertNav('my-grades');
+
+let GRADES=[];
+const gs=await getDocs(collection(db,'grades'));
+gs.forEach(d=>GRADES.push({id:d.id,...d.data()}));
+
+const snap=await getDocs(query(collection(db,'answers'), where('studentId','==',user.uid)));
+const allDocs=[...snap.docs].map(d=>d.data()).sort((a,b)=>(b.createdAt?.toMillis?.()??0)-(a.createdAt?.toMillis?.()??0));
+const checked=allDocs.filter(a=>a.status==='checked');
+const pending=allDocs.filter(a=>a.status!=='checked');
+
+const list=$('list-mg');
+
+if(!checked.length && !pending.length){
+  list.innerHTML='<p class="empty">Ответов нет</p>';
+} else {
+  if(pending.length){
+    const {wrapper:pw,body:pb}=makeCollapsibleSection('gj-dot-pend','Ожидают проверки',pending.length,true);
+    list.appendChild(pw);
+    pending.forEach((a,i)=>{
+      const card=document.createElement('div'); card.className='card';
+      card.innerHTML=`<div class="ci"><h3>${esc(a.topicTitle||'—')}</h3>
+        <p class="muted">${fmt(a.createdAt)}</p></div>
+        <span class="sbadge spend">⏳</span>`;
+      animCard(pb,card,i*0.05);
+    });
+  }
+  if(checked.length){
+    const {wrapper:cw,body:cb}=makeCollapsibleSection('gj-dot-chk','Проверено',checked.length,false);
+    list.appendChild(cw);
+    checked.forEach((a,i)=>{
+      const g=GRADES.find(x=>x.id===a.gradeId);
+      const card=document.createElement('div'); card.className='card';
+      card.innerHTML=`<div class="ci">
+        <h3>${esc(a.topicTitle||'—')}</h3>
+        <p class="muted">${fmt(a.checkedAt)}</p>
+        ${a.feedback?`<p style="font-size:.82rem;color:var(--mu);margin-top:.2rem">💬 ${esc(a.feedback)}</p>`:''}
+        </div>
+        ${g?gradeChip(g,true):''}`;
+      animCard(cb,card,i*0.05);
+    });
+  }
+}
+</script>
+</body>
+</html>

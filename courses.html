@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Курсы — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page" id="page">
+  <div class="ph"><h1>Курсы</h1><button class="btn bp btn-sm" id="btnnc">+ Новый курс</button></div>
+  <div id="list-ac"></div>
+</div>
+
+<!-- Modal: new course -->
+<div id="m-nc" class="mover hidden">
+  <div class="mbox">
+    <h2>Новый курс</h2>
+    <div class="fg"><label>Название</label><input type="text" id="nc-title" placeholder="Математика 10 класс"/></div>
+    <div class="fg"><label>Описание</label><textarea id="nc-desc" placeholder="Краткое описание..."></textarea></div>
+    <div class="mactions">
+      <button class="btn bg" id="nc-cancel">Отмена</button>
+      <button class="btn bp" id="nc-save">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: course access -->
+<div id="m-ca" class="mover hidden">
+  <div class="mbox">
+    <h2>Доступ к курсу</h2>
+    <p class="muted" style="margin-bottom:.5rem">Курс: <strong id="ca-name"></strong></p>
+    <div class="swrap" style="margin-bottom:.6rem"><input type="text" id="ca-search" placeholder="Поиск студента..."/></div>
+    <div class="group-tabs" id="ca-tabs"></div>
+    <div id="ca-list"></div>
+    <div class="mactions">
+      <button class="btn bg" id="ca-cancel">Отмена</button>
+      <button class="btn bp" id="ca-save">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { db, $, esc, toast, animCard, mshow, mhide, requireAuth, buildGroupTabs,
+  collection, doc, getDocs, getDoc, addDoc, deleteDoc, setDoc, query, where, serverTimestamp, State }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user, UP} = await requireAuth();
+if(UP.role !== 'admin'){ window.location.href='index.html'; }
+insertNav('courses');
+
+let GROUPS = [], caAccessMap = null, ACID = null;
+
+// Load groups cache
+const gsnap = await getDocs(collection(db,'groups'));
+GROUPS = []; gsnap.forEach(d=>GROUPS.push({id:d.id,...d.data()}));
+GROUPS.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+async function loadCourses(){
+  const snap = await getDocs(collection(db,'courses'));
+  const list = $('list-ac'); list.innerHTML='';
+  if(snap.empty){ list.innerHTML='<p class="empty">Курсов нет. Создай первый!</p>'; return; }
+  snap.docs.forEach((d,i)=>{
+    const c = d.data();
+    const card = document.createElement('div'); card.className='card';
+    card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
+      <div class="ca">
+        <button class="btn bs btn-sm" data-action="topics" data-id="${d.id}" data-title="${esc(c.title)}">Темы</button>
+        <button class="btn ba btn-sm" data-action="access" data-id="${d.id}" data-title="${esc(c.title)}">Доступ</button>
+        <button class="btn bg btn-sm" data-action="del"    data-id="${d.id}">Удалить</button>
+      </div>`;
+    animCard(list, card, i*0.06);
+  });
+}
+await loadCourses();
+
+$('list-ac').addEventListener('click', async e=>{
+  const btn = e.target.closest('button[data-action]'); if(!btn) return;
+  const {action,id,title} = btn.dataset;
+  if(action==='topics'){
+    State.set('CID', id); State.set('courseTitle', title);
+    window.location.href='topics.html';
+  }
+  if(action==='access'){ await openAccess(id,title); }
+  if(action==='del'){
+    if(!confirm('Удалить курс?')) return;
+    await deleteDoc(doc(db,'courses',id)); toast('Удалён'); loadCourses();
+  }
+});
+
+$('btnnc').onclick = ()=>mshow('m-nc');
+$('nc-cancel').onclick = ()=>mhide('m-nc');
+$('nc-save').onclick = async()=>{
+  const title=$('nc-title').value.trim(), desc=$('nc-desc').value.trim();
+  if(!title){ toast('Введи название','err'); return; }
+  await addDoc(collection(db,'courses'),{title,description:desc,createdAt:serverTimestamp()});
+  mhide('m-nc'); $('nc-title').value=''; $('nc-desc').value='';
+  toast('Курс создан','ok'); loadCourses();
+};
+
+async function openAccess(courseId, courseTitle){
+  ACID = courseId; $('ca-name').textContent=courseTitle; $('ca-search').value='';
+  const [usSnap, enrollSnap] = await Promise.all([
+    getDocs(query(collection(db,'users'),where('role','==','student'))),
+    getDocs(collection(db,'courses',courseId,'enrollments'))
+  ]);
+  const enrolled = new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
+  const students = []; usSnap.forEach(d=>students.push([d.id,d.data()]));
+  caAccessMap = buildGroupTabs('ca-tabs','ca-list',GROUPS,students,enrolled,()=>true,'ca-search');
+  mshow('m-ca');
+}
+$('ca-cancel').onclick = ()=>mhide('m-ca');
+$('ca-save').onclick = async()=>{
+  if(!caAccessMap){ mhide('m-ca'); return; }
+  try{
+    const ops=[];
+    caAccessMap.forEach((checked,uid)=>{
+      const r=doc(db,'courses',ACID,'enrollments',uid);
+      if(checked) ops.push(setDoc(r,{at:serverTimestamp()}));
+      else        ops.push(deleteDoc(r));
+    });
+    await Promise.all(ops); toast('Доступ сохранён ✓','ok');
+  }catch(e){ toast('Ошибка: '+e.message,'err'); }
+  mhide('m-ca');
+};
+</script>
+</body>
+</html>

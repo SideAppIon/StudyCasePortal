@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Достижения — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph"><h1>⭐ Мои достижения</h1></div>
+  <div id="ach-summary"></div>
+  <div id="list-ach"></div>
+</div>
+
+<script type="module">
+import { db, $, esc, fmt, animOnce, requireAuth,
+  collection, getDocs, query, where }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role !== 'student'){ window.location.href='index.html'; }
+insertNav('achievements');
+
+const snap=await getDocs(query(collection(db,'achievements'), where('studentId','==',user.uid)));
+const earned=[]; snap.forEach(d=>earned.push(d.data()));
+earned.sort((a,b)=>(b.earnedAt?.toMillis?.()??0)-(a.earnedAt?.toMillis?.()??0));
+
+const summary=$('ach-summary');
+const list=$('list-ach');
+
+if(earned.length){
+  const cnt=earned.length;
+  summary.innerHTML=`
+    <div class="ach-summary">
+      <div style="font-size:1.8rem">⭐</div>
+      <div>
+        <div class="ach-summary-count">${cnt}</div>
+        <div class="ach-summary-label">достижени${cnt===1?'е':cnt<5?'я':'й'} получено</div>
+      </div>
+    </div>`;
+
+  const grid=document.createElement('div'); grid.className='achievements-grid';
+  earned.forEach((a,i)=>{
+    const card=document.createElement('div'); card.className='ach-card earned';
+    card.innerHTML=`
+      <span class="ach-star">⭐</span>
+      <div class="ach-title">${esc(a.topicTitle||'—')}</div>
+      <div class="ach-desc">${esc(a.courseTitle||'')}</div>
+      <div class="ach-badge-date">${fmt(a.earnedAt)}</div>
+      <div class="ach-desc" style="margin-top:.3rem;color:#92400E;font-weight:600">${a.score}% · ${esc(a.quizTitle||'Тест')}</div>`;
+    grid.appendChild(card);
+    animOnce(card,
+      [{opacity:'0',transform:'scale(.8)'},{opacity:'1',transform:'none'}],
+      {duration:360,delay:i*80,easing:'cubic-bezier(.34,1.56,.64,1)',fill:'both'}
+    );
+  });
+  list.appendChild(grid);
+} else {
+  list.innerHTML=`
+    <div style="text-align:center;padding:3.5rem 1rem">
+      <div style="font-size:3.5rem;margin-bottom:1rem;opacity:.2">⭐</div>
+      <p class="muted">Достижений пока нет.<br/>Проходи тесты, чтобы получить первую звёздочку!</p>
+    </div>`;
+}
+</script>
+</body>
+</html>

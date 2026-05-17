@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Группы — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph"><h1>Группы</h1><button class="btn bp btn-sm" id="btnngrp">+ Новая группа</button></div>
+  <div class="swrap"><input type="text" id="grpsearch" placeholder="Поиск группы..."/></div>
+  <div id="list-grp"></div>
+</div>
+
+<div id="m-ng" class="mover hidden">
+  <div class="mbox">
+    <h2 id="ng-title">Новая группа</h2>
+    <div class="fg"><label>Название</label><input type="text" id="ng-name" placeholder="10Б, Группа А..."/></div>
+    <div class="fg"><label>Описание</label><input type="text" id="ng-desc" placeholder="Необязательно"/></div>
+    <div class="mactions">
+      <button class="btn bg" id="ng-cancel">Отмена</button>
+      <button class="btn bp" id="ng-save">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { db, $, esc, toast, animOnce, mshow, mhide, requireAuth,
+  collection, doc, getDocs, addDoc, updateDoc, deleteDoc, query, where, serverTimestamp }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role !== 'admin'){ window.location.href='index.html'; }
+insertNav('groups');
+
+let GROUPS=[], EGID=null;
+
+async function loadGroups(){
+  const [gSnap, uSnap] = await Promise.all([
+    getDocs(collection(db,'groups')),
+    getDocs(query(collection(db,'users'), where('role','==','student')))
+  ]);
+  GROUPS=[]; gSnap.forEach(d=>GROUPS.push({id:d.id,...d.data()}));
+  GROUPS.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+  const memberCount={}, membersByGroup={};
+  uSnap.forEach(d=>{
+    const u=d.data(), gid=u.groupId||'__none__';
+    memberCount[gid]=(memberCount[gid]||0)+1;
+    (membersByGroup[gid]=membersByGroup[gid]||[]).push({id:d.id,...u});
+  });
+
+  render('', memberCount, membersByGroup);
+  $('grpsearch').oninput=function(){ render(this.value, memberCount, membersByGroup); };
+}
+
+function render(filter, memberCount, membersByGroup){
+  const list=$('list-grp'); list.innerHTML='';
+  const f=filter.toLowerCase();
+  if(!GROUPS.length){ list.innerHTML='<p class="empty">Групп нет. Создай первую!</p>'; return; }
+
+  GROUPS.filter(g=>!f||(g.name||'').toLowerCase().includes(f)).forEach((g,gi)=>{
+    const cnt=memberCount[g.id]||0;
+    const members=(membersByGroup[g.id]||[]).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+    const initials=(g.name||'?').slice(0,2).toUpperCase();
+
+    const wrapper=document.createElement('div'); wrapper.style.marginBottom='.55rem';
+
+    const card=document.createElement('div'); card.className='grp-card';
+    card.innerHTML=`
+      <div class="grp-icon">${initials}</div>
+      <div class="grp-info">
+        <div class="grp-name">${esc(g.name)}</div>
+        <div class="grp-meta">
+          ${g.description?`<span>📋 ${esc(g.description)}</span>`:''}
+          <span class="grp-member-count">👤 ${cnt} студент${cnt===1?'':cnt<5&&cnt>1?'а':'ов'}</span>
+        </div>
+      </div>
+      <div class="ca">
+        <button class="btn bs btn-sm" data-toggle="${g.id}">👁 Студенты</button>
+        <button class="btn bs btn-sm" data-action="edit" data-id="${g.id}" data-name="${esc(g.name)}" data-desc="${esc(g.description||'')}">✏</button>
+        <button class="btn bg btn-sm" data-action="del"  data-id="${g.id}">✕</button>
+      </div>`;
+
+    const panel=document.createElement('div'); panel.className='grp-members-panel'; panel.id='panel-'+g.id;
+    if(!members.length){
+      panel.innerHTML='<p class="empty" style="padding:.6rem 0">Студентов нет</p>';
+    } else {
+      members.forEach(m=>{
+        const row=document.createElement('div'); row.className='member-row';
+        const ini=(m.name||m.email||'?')[0].toUpperCase();
+        row.innerHTML=`<div class="member-avatar">${ini}</div>
+          <div style="flex:1;min-width:0">
+            <div class="member-name">${esc(m.name||'—')}</div>
+            <div class="member-email">${esc(m.email)}</div>
+          </div>`;
+        panel.appendChild(row);
+      });
+    }
+
+    card.querySelector('button[data-toggle]').addEventListener('click',e=>{
+      e.stopPropagation();
+      panel.classList.toggle('open');
+      e.target.textContent=panel.classList.contains('open')?'▼ Скрыть':'👁 Студенты';
+    });
+    card.addEventListener('click',e=>{
+      const btn=e.target.closest('button[data-action]'); if(!btn) return;
+      if(btn.dataset.action==='edit'){
+        EGID=btn.dataset.id;
+        $('ng-title').textContent='Редактировать группу';
+        $('ng-name').value=btn.dataset.name;
+        $('ng-desc').value=btn.dataset.desc;
+        mshow('m-ng');
+      }
+      if(btn.dataset.action==='del'){
+        if(!confirm('Удалить группу?')) return;
+        deleteGroup(btn.dataset.id);
+      }
+    });
+
+    wrapper.appendChild(card); wrapper.appendChild(panel);
+    animOnce(wrapper,[{opacity:'0',transform:'translateY(10px)'},{opacity:'1',transform:'none'}],
+      {duration:240,delay:gi*55,easing:'ease',fill:'both'});
+    list.appendChild(wrapper);
+  });
+
+  if(!list.children.length) list.innerHTML='<p class="empty">Ничего не найдено</p>';
+}
+
+async function deleteGroup(id){
+  await deleteDoc(doc(db,'groups',id));
+  const usnap=await getDocs(query(collection(db,'users'),where('groupId','==',id)));
+  await Promise.all(usnap.docs.map(d=>updateDoc(doc(db,'users',d.id),{groupId:'',groupName:''})));
+  toast('Группа удалена'); loadGroups();
+}
+
+await loadGroups();
+
+$('btnngrp').onclick=()=>{ EGID=null; $('ng-title').textContent='Новая группа'; $('ng-name').value=''; $('ng-desc').value=''; mshow('m-ng'); };
+$('ng-cancel').onclick=()=>mhide('m-ng');
+$('ng-save').onclick=async()=>{
+  const name=$('ng-name').value.trim(); if(!name){ toast('Введи название','err'); return; }
+  const desc=$('ng-desc').value.trim();
+  if(EGID){
+    await updateDoc(doc(db,'groups',EGID),{name,description:desc});
+    const usnap=await getDocs(query(collection(db,'users'),where('groupId','==',EGID)));
+    await Promise.all(usnap.docs.map(d=>updateDoc(doc(db,'users',d.id),{groupName:name})));
+    toast('Группа обновлена','ok');
+  } else {
+    await addDoc(collection(db,'groups'),{name,description:desc,createdAt:serverTimestamp()});
+    toast('Группа создана','ok');
+  }
+  EGID=null; mhide('m-ng'); loadGroups();
+};
+</script>
+</body>
+</html>

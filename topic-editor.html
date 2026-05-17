@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Редактор темы — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph">
+    <a href="topics.html" class="bbk">← К темам</a>
+    <h1 id="lbl-te">Тема</h1>
+  </div>
+  <div style="display:flex;gap:.8rem;margin-bottom:1rem;flex-wrap:wrap;">
+    <div class="fg" style="flex:1;min-width:170px;margin:0"><label>Название темы</label><input type="text" id="te-title" placeholder="Тема 1 — Введение"/></div>
+    <div class="fg" style="width:100px;margin:0"><label>Порядок</label><input type="number" id="te-order" value="0" min="0"/></div>
+  </div>
+  <div class="etb">
+    <span>Добавить блок:</span>
+    <button class="btn bs btn-sm" id="add-text">📝 Текст</button>
+    <button class="btn bs btn-sm" id="add-img">🖼 Картинка</button>
+    <button class="btn bs btn-sm" id="add-vid">▶ Видео</button>
+    <button class="btn bs btn-sm" id="add-q">❓ Вопрос</button>
+    <button class="btn bgold btn-sm" id="add-quiz">🎯 Тест</button>
+  </div>
+  <div id="blocks"></div>
+  <div class="efooter">
+    <a href="topics.html" class="btn bg">Отмена</a>
+    <button class="btn bp" id="save-te">💾 Сохранить тему</button>
+  </div>
+</div>
+
+<script type="module">
+import { db, $, esc, toast, animOnce, requireAuth,
+  collection, doc, getDoc, addDoc, updateDoc, serverTimestamp, State }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user, UP} = await requireAuth();
+if(UP.role !== 'admin'){ window.location.href='index.html'; }
+insertNav('courses');
+
+const CID  = State.get('CID');
+const ETID = State.get('ETID'); // null = new topic
+if(!CID){ window.location.href='courses.html'; }
+
+let EB = [];
+
+if(ETID){
+  $('lbl-te').textContent='Редактировать тему';
+  const snap = await getDoc(doc(db,'courses',CID,'topics',ETID));
+  const t = snap.data();
+  $('te-title').value = t.title||'';
+  $('te-order').value = t.order||0;
+  EB = JSON.parse(JSON.stringify(t.blocks||[]));
+} else {
+  $('lbl-te').textContent='Новая тема';
+}
+renderEditor();
+
+// ── Block editor ──────────────────────────────────────────────
+function syncDOM(){
+  EB.forEach((b,i)=>{
+    if(b.type==='text')    {const e=$('bc'+i);if(e)b.content=e.value;}
+    if(b.type==='image')   {const e=$('bi'+i);if(e)b.url=e.value.trim();}
+    if(b.type==='video')   {const e=$('bv'+i);if(e)b.url=e.value.trim();}
+    if(b.type==='question'){const e=$('bq'+i);if(e)b.question=e.value;}
+    if(b.type==='quiz')    {syncQuizDOM(b,i);}
+  });
+}
+
+function syncQuizDOM(b,i){
+  const t=$('qztitle'+i); if(t) b.quizTitle=t.value.trim();
+  const p=$('qzpass'+i);  if(p) b.passingScore=parseInt(p.value)||0;
+  const a=$('qzatt'+i);   if(a) b.maxAttempts=a.value==='unlimited'?0:parseInt(a.value)||1;
+  (b.questions||[]).forEach((q,qi)=>{
+    const qEl=$('qzq'+i+'_'+qi);  if(qEl) q.text=qEl.value.trim();
+    const pEl=$('qzpt'+i+'_'+qi); if(pEl) q.points=parseInt(pEl.value)||1;
+    if(q.type==='choice'){
+      const container=$('qzqs'+i);
+      if(container){
+        const optEls=container.querySelectorAll(`[data-qi="${qi}"] .quiz-opt-inp`);
+        q.options=[...optEls].map(o=>o.value.trim());
+        const corrEl=container.querySelector(`[data-qi="${qi}"] .quiz-correct-sel`);
+        if(corrEl) q.correctIndex=parseInt(corrEl.value)||0;
+      }
+    }
+  });
+}
+
+$('add-text').onclick=()=>{syncDOM();EB.push({type:'text',content:''});renderEditor();};
+$('add-img').onclick= ()=>{syncDOM();EB.push({type:'image',url:''});renderEditor();};
+$('add-vid').onclick= ()=>{syncDOM();EB.push({type:'video',url:''});renderEditor();};
+$('add-q').onclick=   ()=>{syncDOM();EB.push({type:'question',question:''});renderEditor();};
+$('add-quiz').onclick= ()=>{syncDOM();EB.push({type:'quiz',quizTitle:'Тест',passingScore:60,maxAttempts:3,questions:[]});renderEditor();};
+
+$('blocks').addEventListener('click',e=>{
+  const btn=e.target.closest('button[data-baction]'); if(!btn) return;
+  const i=+btn.dataset.idx, a=btn.dataset.baction;
+  syncDOM();
+  if(a==='up' && i>0)            {const b=EB.splice(i,1)[0];EB.splice(i-1,0,b);}
+  if(a==='dn' && i<EB.length-1)  {const b=EB.splice(i,1)[0];EB.splice(i+1,0,b);}
+  if(a==='del'){if(!confirm('Удалить блок?'))return;EB.splice(i,1);}
+  if(a==='addquizq')       {EB[i].questions.push({type:'open',text:'',points:1});}
+  if(a==='addquizqchoice') {EB[i].questions.push({type:'choice',text:'',points:1,options:['','','',''],correctIndex:0});}
+  if(a==='delquizq')       {EB[i].questions.splice(+btn.dataset.qi,1);}
+  renderEditor();
+});
+
+function renderEditor(){
+  const c=$('blocks'); c.innerHTML='';
+  if(!EB.length){c.innerHTML='<p class="empty">Нет блоков. Добавь кнопками выше.</p>';return;}
+  EB.forEach((b,i)=>{
+    const w=document.createElement('div'); w.className='bwrap';
+    const nm=b.type==='text'?'📝 Текст':b.type==='image'?'🖼 Картинка':b.type==='video'?'▶ Видео':b.type==='quiz'?'🎯 Тест':'❓ Вопрос';
+    let body='';
+    if(b.type==='text')
+      body=`<textarea id="bc${i}" class="bta" placeholder="Введи текст...">${esc(b.content||'')}</textarea>`;
+    else if(b.type==='image')
+      body=`<label class="blbl">Прямая ссылка на картинку</label>
+        <input id="bi${i}" type="url" class="binp" value="${esc(b.url||'')}" placeholder="https://i.imgur.com/example.jpg"/>
+        <p class="bhint">Загрузи на <a href="https://imgbb.com" target="_blank">imgbb.com</a> или <a href="https://imgur.com" target="_blank">imgur.com</a>.</p>
+        ${b.url?`<img class="bprev" src="${esc(b.url)}" onerror="this.style.display='none'"/>`:''}`;
+    else if(b.type==='video')
+      body=`<label class="blbl">Ссылка или &lt;iframe&gt;</label>
+        <textarea id="bv${i}" class="bta bta-sm" placeholder="YouTube / ВКонтакте / iframe...">${esc(b.url||'')}</textarea>`;
+    else if(b.type==='question')
+      body=`<label class="blbl">Вопрос для студента</label>
+        <textarea id="bq${i}" class="bta bta-sm" placeholder="Напиши вопрос...">${esc(b.question||'')}</textarea>`;
+    else if(b.type==='quiz')
+      body=buildQuizEditorBody(b,i);
+
+    w.innerHTML=`<div class="bhdr"><span class="btype">${nm}</span>
+      <div class="bbtns">
+        ${i>0?`<button class="xbtn" data-baction="up" data-idx="${i}">↑</button>`:''}
+        ${i<EB.length-1?`<button class="xbtn" data-baction="dn" data-idx="${i}">↓</button>`:''}
+        <button class="xbtn xdel" data-baction="del" data-idx="${i}">✕</button>
+      </div></div><div class="bbody">${body}</div>`;
+    c.appendChild(w);
+    animOnce(w,[{opacity:'0',transform:'translateX(-8px)'},{opacity:'1',transform:'none'}],
+      {duration:200,delay:i*35,easing:'ease',fill:'both'});
+  });
+}
+
+function buildQuizEditorBody(b,i){
+  const qs=b.questions||[];
+  const attOpts=[1,2,3,5,10].map(v=>`<option value="${v}" ${b.maxAttempts===v?'selected':''}>${v} попытки</option>`).join('');
+  const qHtml=qs.map((q,qi)=>{
+    let optHtml='';
+    if(q.type==='choice'){
+      const opts=(q.options||['','','']).map((o,oi)=>`<input class="quiz-opt-inp binp" type="text" value="${esc(o)}" placeholder="Вариант ${oi+1}"/>`).join('');
+      const corrSel=`<select class="quiz-correct-sel" style="margin-top:.3rem;width:100%">`
+        +(q.options||[]).map((o,oi)=>`<option value="${oi}" ${q.correctIndex===oi?'selected':''}>${esc(o)||'Вариант '+(oi+1)}</option>`).join('')+'</select>';
+      optHtml=`<div style="margin-top:.4rem">${opts}${corrSel}</div>`;
+    }
+    return `<div class="quiz-q-item" data-qi="${qi}">
+      <div class="quiz-q-header">
+        <span style="font-size:.75rem;font-weight:700;color:var(--mu);flex-shrink:0">В${qi+1}${q.type==='choice'?'':'(откр)'}</span>
+        <input type="text" id="qzq${i}_${qi}" class="binp" style="margin:0" value="${esc(q.text||'')}" placeholder="Текст вопроса"/>
+        <input type="number" id="qzpt${i}_${qi}" class="quiz-q-pts" min="1" max="100" value="${q.points||1}" title="Баллы за вопрос"/>
+        <button class="xbtn xdel" data-baction="delquizq" data-idx="${i}" data-qi="${qi}">✕</button>
+      </div>${optHtml}</div>`;
+  }).join('');
+
+  return `<div class="quiz-block-wrap">
+    <div class="fg" style="margin-bottom:.6rem">
+      <label class="blbl">Название теста</label>
+      <input type="text" id="qztitle${i}" value="${esc(b.quizTitle||'Тест')}" placeholder="Итоговый тест..."/>
+    </div>
+    <div class="quiz-settings-row">
+      <div class="fg"><label class="blbl">Порог прохождения (%)</label>
+        <input type="number" id="qzpass${i}" min="0" max="100" value="${b.passingScore||60}"/></div>
+      <div class="fg"><label class="blbl">Попытки</label>
+        <select id="qzatt${i}">
+          <option value="unlimited" ${!b.maxAttempts?'selected':''}>Безлимит</option>
+          ${attOpts}
+        </select></div>
+    </div>
+    <div id="qzqs${i}" class="quiz-q-list">${qHtml}</div>
+    <div style="display:flex;gap:.5rem;margin-top:.75rem;flex-wrap:wrap">
+      <button class="quiz-add-q-btn" data-baction="addquizq"       data-idx="${i}">+ Открытый вопрос</button>
+      <button class="quiz-add-q-btn" data-baction="addquizqchoice" data-idx="${i}">+ Выбор ответа</button>
+    </div>
+  </div>`;
+}
+
+$('save-te').onclick = async()=>{
+  const title=$('te-title').value.trim();
+  if(!title){ toast('Введи название','err'); return; }
+  syncDOM();
+  const data={title, order:parseInt($('te-order').value)||0, blocks:EB, updatedAt:serverTimestamp()};
+  try{
+    if(ETID){
+      await updateDoc(doc(db,'courses',CID,'topics',ETID),data);
+      toast('Сохранено ✓','ok');
+    } else {
+      data.createdAt=serverTimestamp();
+      await addDoc(collection(db,'courses',CID,'topics'),data);
+      toast('Создана ✓','ok');
+    }
+    window.location.href='topics.html';
+  }catch(e){ toast('Ошибка: '+e.message,'err'); console.error(e); }
+};
+</script>
+</body>
+</html>

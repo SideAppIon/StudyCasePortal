@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Темы — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph">
+    <a href="courses.html" class="bbk">← Курсы</a>
+    <h1 id="lbl-course"></h1>
+    <button class="btn bp btn-sm" id="btnnt">+ Новая тема</button>
+  </div>
+  <div id="list-at"></div>
+</div>
+
+<!-- Modal: topic access -->
+<div id="m-ta" class="mover hidden">
+  <div class="mbox">
+    <h2>Доступ к теме</h2>
+    <p class="muted" style="margin-bottom:.5rem">Тема: <strong id="ta-name"></strong></p>
+    <div class="swrap" style="margin-bottom:.6rem"><input type="text" id="ta-search" placeholder="Поиск студента..."/></div>
+    <div class="group-tabs" id="ta-tabs"></div>
+    <div id="ta-list"></div>
+    <div class="mactions">
+      <button class="btn bg" id="ta-cancel">Отмена</button>
+      <button class="btn bp" id="ta-save">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { db, $, esc, toast, animCard, mshow, mhide, requireAuth, buildGroupTabs,
+  collection, doc, getDocs, addDoc, deleteDoc, setDoc, query, where, serverTimestamp, State }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user, UP} = await requireAuth();
+if(UP.role !== 'admin'){ window.location.href='index.html'; }
+insertNav('courses');
+
+const CID = State.get('CID');
+const courseTitle = State.get('courseTitle') || '';
+if(!CID){ window.location.href='courses.html'; }
+$('lbl-course').textContent = courseTitle;
+
+let GROUPS=[], taAccessMap=null, ATID=null;
+const gsnap = await getDocs(collection(db,'groups'));
+GROUPS=[]; gsnap.forEach(d=>GROUPS.push({id:d.id,...d.data()}));
+GROUPS.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+async function loadTopics(){
+  const snap = await getDocs(collection(db,'courses',CID,'topics'));
+  const list = $('list-at'); list.innerHTML='';
+  const topics=[]; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
+  topics.sort((a,b)=>(a.order||0)-(b.order||0));
+  if(!topics.length){ list.innerHTML='<p class="empty">Тем нет. Создай первую!</p>'; return; }
+  topics.forEach((t,i)=>{
+    const bc=(t.blocks||[]).length;
+    const hasQuiz=(t.blocks||[]).some(b=>b.type==='quiz');
+    const card=document.createElement('div'); card.className='card';
+    card.innerHTML=`<div class="ci">
+      <h3>${esc(t.title)}${hasQuiz?' <span class="star-badge">🎯 Тест</span>':''}</h3>
+      <p class="muted">Порядок: ${t.order||0} · Блоков: ${bc}</p></div>
+      <div class="ca">
+        <button class="btn bs btn-sm" data-action="edit"   data-id="${t.id}">✏ Ред.</button>
+        <button class="btn ba btn-sm" data-action="access" data-id="${t.id}" data-title="${esc(t.title)}">🔓 Доступ</button>
+        <button class="btn bg btn-sm" data-action="del"    data-id="${t.id}">✕</button>
+      </div>`;
+    animCard(list,card,i*0.06);
+  });
+}
+await loadTopics();
+
+$('list-at').addEventListener('click', async e=>{
+  const btn=e.target.closest('button[data-action]'); if(!btn) return;
+  const {action,id,title}=btn.dataset;
+  if(action==='edit'){
+    State.set('ETID',id); window.location.href='topic-editor.html';
+  }
+  if(action==='access'){ await openAccess(id,title); }
+  if(action==='del'){
+    if(!confirm('Удалить тему?')) return;
+    await deleteDoc(doc(db,'courses',CID,'topics',id)); toast('Удалено'); loadTopics();
+  }
+});
+
+$('btnnt').onclick=()=>{ State.del('ETID'); window.location.href='topic-editor.html'; };
+
+async function openAccess(topicId, topicTitle){
+  ATID=topicId; $('ta-name').textContent=topicTitle; $('ta-search').value='';
+  const [enrollSnap,accessSnap,usSnap]=await Promise.all([
+    getDocs(collection(db,'courses',CID,'enrollments')),
+    getDocs(collection(db,'courses',CID,'topics',topicId,'access')),
+    getDocs(query(collection(db,'users'),where('role','==','student')))
+  ]);
+  const enrolled=new Set(); enrollSnap.forEach(d=>enrolled.add(d.id));
+  const allowed=new Set();  accessSnap.forEach(d=>allowed.add(d.id));
+  if(!enrolled.size){
+    $('ta-tabs').innerHTML='';
+    $('ta-list').innerHTML='<p class="empty">На этот курс никто не записан.</p>';
+    mshow('m-ta'); return;
+  }
+  const students=[]; usSnap.forEach(d=>{ if(enrolled.has(d.id)) students.push([d.id,d.data()]); });
+  taAccessMap=buildGroupTabs('ta-tabs','ta-list',GROUPS,students,allowed,uid=>enrolled.has(uid),'ta-search');
+  mshow('m-ta');
+}
+$('ta-cancel').onclick=()=>mhide('m-ta');
+$('ta-save').onclick=async()=>{
+  if(!taAccessMap){ mhide('m-ta'); return; }
+  try{
+    const ops=[];
+    taAccessMap.forEach((checked,uid)=>{
+      const r=doc(db,'courses',CID,'topics',ATID,'access',uid);
+      if(checked) ops.push(setDoc(r,{at:serverTimestamp()}));
+      else        ops.push(deleteDoc(r));
+    });
+    await Promise.all(ops); toast('Доступ к теме сохранён ✓','ok');
+  }catch(e){ toast('Ошибка: '+e.message,'err'); }
+  mhide('m-ta');
+};
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Вход — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="lbox" id="lbox">
+    <div class="llogo">
+      <img class="logo-img" src="" alt="" style="max-height:52px;max-width:180px;margin:0 auto .45rem;display:none;"/>
+      <div class="lbrand logo-text">Study Case Portal</div>
+      <p class="lsub">Войди в свой аккаунт</p>
+    </div>
+    <div class="fg"><label>Email</label><input type="email" id="lemail" placeholder="example@mail.ru"/></div>
+    <div class="fg"><label>Пароль</label><input type="password" id="lpass" placeholder="••••••••"/></div>
+    <button class="btn bp bfull" id="btnlogin">Войти</button>
+  </div>
+</div>
+
+<script type="module">
+import { auth, db, doc, getDoc, signOut, onAuthStateChanged, updatePassword,
+  updateDoc, $, esc, toast, animOnce, tryLogo, loadSiteSettings, firebaseConfig, State }
+  from './firebase.js';
+import { signInWithEmailAndPassword }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+// Animate login box
+document.getElementById('lbox').animate(
+  [{opacity:'0',transform:'scale(.9) translateY(12px)'},{opacity:'1',transform:'none'}],
+  {duration:400,easing:'cubic-bezier(.34,1.56,.64,1)',fill:'both'}
+);
+
+tryLogo(['logo.png','logo.PNG','logo.jpg','logo.JPG']);
+await loadSiteSettings();
+
+// If already logged in — redirect
+onAuthStateChanged(auth, async user=>{
+  if(!user) return;
+  const snap = await getDoc(doc(db,'users',user.uid));
+  if(!snap.exists()){ await signOut(auth); return; }
+  const UP = snap.data();
+  State.set('UP', UP);
+  redirectByRole(UP.role);
+});
+
+function redirectByRole(role){
+  if(role==='admin')        window.location.href='courses.html';
+  else if(role==='teacher') window.location.href='answers.html';
+  else                      window.location.href='my-courses.html';
+}
+
+$('btnlogin').onclick = async()=>{
+  const email = $('lemail').value.trim(), pass = $('lpass').value;
+  if(!email||!pass){ toast('Заполни все поля','err'); return; }
+  $('btnlogin').innerHTML='<span class="spinner"></span>Вхожу...';
+  try{
+    const cred = await signInWithEmailAndPassword(auth, email, pass);
+    const snap = await getDoc(doc(db,'users',cred.user.uid));
+    if(!snap.exists()){ toast('Пользователь не найден','err'); $('btnlogin').textContent='Войти'; return; }
+    const UP = snap.data();
+    // Pending password
+    if(UP.pendingPassword){
+      try{
+        await updatePassword(cred.user, UP.pendingPassword);
+        await updateDoc(doc(db,'users',cred.user.uid),{pendingPassword:''});
+      }catch(e){}
+    }
+    State.set('UP', UP);
+    State.set('UID', cred.user.uid);
+    State.set('EMAIL', cred.user.email);
+    redirectByRole(UP.role);
+  }catch{
+    toast('Неверный email или пароль','err');
+    $('btnlogin').textContent='Войти';
+  }
+};
+$('lpass').onkeydown = e=>{ if(e.key==='Enter') $('btnlogin').click(); };
+</script>
+</body>
+</html>

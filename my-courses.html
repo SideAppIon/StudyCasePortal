@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Мои курсы — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph"><h1>Мои курсы</h1></div>
+  <div id="list-sc"></div>
+</div>
+
+<script type="module">
+import { db, $, esc, animCard, requireAuth, State,
+  collection, doc, getDocs, getDoc }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role !== 'student'){ window.location.href='index.html'; }
+insertNav('my-courses');
+
+const list=$('list-sc');
+list.innerHTML='<div class="skeleton"></div><div class="skeleton"></div>';
+
+const allSnap=await getDocs(collection(db,'courses'));
+const visible=[];
+for(const d of allSnap.docs){
+  const e=await getDoc(doc(db,'courses',d.id,'enrollments',user.uid));
+  if(e.exists()) visible.push({id:d.id,...d.data()});
+}
+
+list.innerHTML='';
+if(!visible.length){ list.innerHTML='<p class="empty">Тебе пока не открыт доступ ни к одному курсу</p>'; }
+else {
+  visible.forEach((c,i)=>{
+    const card=document.createElement('div'); card.className='card clk';
+    card.innerHTML=`<div class="ci"><h3>${esc(c.title)}</h3><p>${esc(c.description||'')}</p></div>
+      <div class="carrow">→</div>`;
+    card.addEventListener('click',()=>{
+      State.set('CID',c.id);
+      State.set('courseTitle',c.title);
+      window.location.href='topics-student.html';
+    });
+    animCard(list,card,i*0.07);
+  });
+}
+</script>
+</body>
+</html>

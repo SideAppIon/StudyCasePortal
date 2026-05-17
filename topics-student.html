@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Темы курса — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph">
+    <a href="my-courses.html" class="bbk">← Курсы</a>
+    <h1 id="lbl-course"></h1>
+  </div>
+  <div id="list-st"></div>
+</div>
+
+<script type="module">
+import { db, $, esc, animCard, requireAuth, State,
+  collection, doc, getDocs, getDoc, query, where }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role !== 'student'){ window.location.href='index.html'; }
+insertNav('my-courses');
+
+const CID = State.get('CID');
+const courseTitle = State.get('courseTitle')||'';
+if(!CID){ window.location.href='my-courses.html'; }
+$('lbl-course').textContent = courseTitle;
+
+const snap=await getDocs(collection(db,'courses',CID,'topics'));
+const topics=[]; snap.forEach(d=>topics.push({id:d.id,...d.data()}));
+topics.sort((a,b)=>(a.order||0)-(b.order||0));
+
+// Load earned achievements for this course
+const achSnap=await getDocs(query(collection(db,'achievements'),
+  where('studentId','==',user.uid), where('courseId','==',CID)));
+const earnedTopics=new Set(); achSnap.forEach(d=>earnedTopics.add(d.data().topicId));
+
+const list=$('list-st');
+
+for(let i=0;i<topics.length;i++){
+  const t=topics[i];
+  const aSnap=await getDoc(doc(db,'courses',CID,'topics',t.id,'access',user.uid));
+  const ok=aSnap.exists();
+  const hasQuiz=(t.blocks||[]).some(b=>b.type==='quiz');
+  const qCount=(t.blocks||[]).filter(b=>b.type==='question').length;
+  const starred=earnedTopics.has(t.id);
+
+  const card=document.createElement('div'); card.className=`card ${ok?'clk':'locked'}`;
+  card.innerHTML=`
+    <div class="licon">${ok?'📖':'🔒'}</div>
+    <div class="ci">
+      <h3>${esc(t.title)}</h3>
+      <p>${ok?(hasQuiz?`🎯 Тест${qCount?' + '+qCount+' вопрос(а)':''}`:qCount?`${qCount} вопрос(а)`:'Материал для изучения'):'Заблокировано'}</p>
+    </div>
+    ${starred?'<span class="star-badge">⭐</span>':''}`;
+
+  if(ok) card.addEventListener('click',()=>{
+    State.set('TOPIC', t);
+    window.location.href='topic-view.html';
+  });
+  animCard(list,card,i*0.06);
+}
+if(!list.children.length) list.innerHTML='<p class="empty">Тем нет</p>';
+</script>
+</body>
+</html>

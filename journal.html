@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Журнал оценок — Study Case Portal</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="page">
+  <div class="ph"><h1>Журнал оценок</h1></div>
+  <div class="group-tabs" id="gj-group-tabs"></div>
+  <div id="list-gj"></div>
+</div>
+
+<script type="module">
+import { db, $, esc, fmt, requireAuth, makeCollapsibleSection, gradeChip, animOnce,
+  collection, getDocs, query, orderBy }
+  from './firebase.js';
+import { insertNav } from './nav.js';
+
+const {user,UP} = await requireAuth();
+if(UP.role==='student'){ window.location.href='index.html'; }
+insertNav('journal');
+
+let GRADES=[], GROUPS=[];
+const [gSnap,grpSnap]=await Promise.all([
+  getDocs(collection(db,'grades')),
+  getDocs(collection(db,'groups'))
+]);
+gSnap.forEach(d=>GRADES.push({id:d.id,...d.data()}));
+grpSnap.forEach(d=>GROUPS.push({id:d.id,...d.data()}));
+GROUPS.sort((a,b)=>(a.name||'').localeCompare(b.name||''));
+
+const snap=await getDocs(query(collection(db,'answers'),orderBy('createdAt','desc')));
+const checked=[], pending=[];
+snap.forEach(d=>{
+  const a=d.data();
+  if(a.status==='checked') checked.push(a); else pending.push(a);
+});
+
+const list=$('list-gj');
+const tabsEl=$('gj-group-tabs');
+let activeGrp='';
+
+function renderJournal(){
+  list.innerHTML='';
+  const filtPend=!activeGrp?pending:pending.filter(a=>(a.studentGroupId||'')=== activeGrp);
+  const filtChk =!activeGrp?checked:checked.filter(a=>(a.studentGroupId||'')===activeGrp);
+
+  if(!filtPend.length && !filtChk.length){
+    list.innerHTML='<p class="empty">Нет данных</p>'; return;
+  }
+
+  if(filtPend.length){
+    const {wrapper:pw,body:pb}=makeCollapsibleSection('gj-dot-pend','На проверке',filtPend.length,true);
+    list.appendChild(pw);
+    const byS={};
+    filtPend.forEach(a=>{ const n=a.studentName||a.studentEmail; (byS[n]=byS[n]||[]).push(a); });
+    Object.entries(byS).forEach(([name,entries],si)=>{
+      const sec=document.createElement('div'); sec.className='gsec';
+      sec.innerHTML=`<h3 class="gname">${esc(name)}${entries[0].studentGroupName?` <span class="grptag">${esc(entries[0].studentGroupName)}</span>`:''}</h3>`;
+      entries.forEach(a=>{
+        const row=document.createElement('div'); row.className='grow';
+        row.innerHTML=`<span class="gtopic">${esc(a.topicTitle||'—')}</span>
+          <span class="muted">${fmt(a.createdAt)}</span>
+          <span class="sbadge spend">⏳ Ожидает</span>`;
+        sec.appendChild(row);
+      });
+      pb.appendChild(sec);
+      animOnce(sec,[{opacity:'0',transform:'translateY(8px)'},{opacity:'1',transform:'none'}],{duration:220,delay:si*45,easing:'ease',fill:'both'});
+    });
+  }
+
+  if(filtChk.length){
+    const {wrapper:cw,body:cb}=makeCollapsibleSection('gj-dot-chk','Проверено',filtChk.length,false);
+    list.appendChild(cw);
+    const byS={};
+    filtChk.forEach(a=>{ const n=a.studentName||a.studentEmail; (byS[n]=byS[n]||[]).push(a); });
+    Object.entries(byS).forEach(([name,entries],si)=>{
+      const sec=document.createElement('div'); sec.className='gsec';
+      sec.innerHTML=`<h3 class="gname">${esc(name)}${entries[0].studentGroupName?` <span class="grptag">${esc(entries[0].studentGroupName)}</span>`:''}</h3>`;
+      entries.forEach(a=>{
+        const g=GRADES.find(x=>x.id===a.gradeId);
+        const row=document.createElement('div'); row.className='grow';
+        row.innerHTML=`<span class="gtopic">${esc(a.topicTitle||'—')}</span>
+          <span class="muted">${fmt(a.checkedAt)}</span>
+          ${g?gradeChip(g):'<span class="muted">—</span>'}`;
+        sec.appendChild(row);
+      });
+      cb.appendChild(sec);
+      animOnce(sec,[{opacity:'0',transform:'translateY(8px)'},{opacity:'1',transform:'none'}],{duration:220,delay:si*45,easing:'ease',fill:'both'});
+    });
+  }
+}
+
+// Group filter tabs
+const allBtn=document.createElement('button'); allBtn.className='gtab active'; allBtn.textContent='Все группы';
+allBtn.addEventListener('click',()=>{ activeGrp=''; tabsEl.querySelectorAll('.gtab').forEach(x=>x.classList.remove('active')); allBtn.classList.add('active'); renderJournal(); });
+tabsEl.appendChild(allBtn);
+GROUPS.forEach(g=>{
+  const btn=document.createElement('button'); btn.className='gtab'; btn.textContent=g.name;
+  btn.addEventListener('click',()=>{ activeGrp=g.id; tabsEl.querySelectorAll('.gtab').forEach(x=>x.classList.remove('active')); btn.classList.add('active'); renderJournal(); });
+  tabsEl.appendChild(btn);
+});
+
+renderJournal();
+</script>
+</body>
+</html>
